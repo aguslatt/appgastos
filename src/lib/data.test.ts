@@ -7,7 +7,7 @@ import {
   isColorKey,
   pickNewCategoryColor,
 } from './categories';
-import { DATA_VERSION, MAX_NAME_LENGTH, MAX_NOTE_LENGTH, createInitialData, makeIdGenerator, normalizeData } from './data';
+import { DATA_VERSION, MAX_NAME_LENGTH, MAX_NOTE_LENGTH, cleanText, createInitialData, makeIdGenerator, normalizeData } from './data';
 import type { AppData, Category } from './types';
 
 const TODAY = '2026-10-02';
@@ -1397,7 +1397,9 @@ describe('normalizeData: robustness', () => {
     expect(Object.getPrototypeOf(result.expenses[0]!)).toBe(Object.prototype);
   });
 
-  it('copes with extreme sizes', () => {
+  // Heavy on purpose (a million characters three times, twenty thousand long notes), so it gets room
+  // to finish on a slow, busy machine; the cut itself is checked for speed in the next test.
+  it('copes with extreme sizes', { timeout: 30_000 }, () => {
     const data = normalized({
       categories: [rawCategory({ name: 'n'.repeat(1_000_000), emoji: 'e'.repeat(1_000_000), kind: 'k'.repeat(1_000_000) })],
       expenses: Array.from({ length: 20_000 }, (_, i) => rawExpense({ id: `e${i}`, note: 'x'.repeat(200) })),
@@ -1405,6 +1407,48 @@ describe('normalizeData: robustness', () => {
     expect(data.expenses).toHaveLength(20_000);
     expect(data.categories[0]!.name).toHaveLength(MAX_NAME_LENGTH);
     expect(data.expenses[19_999]!.note).toHaveLength(Math.min(200, MAX_NOTE_LENGTH));
+  });
+
+  describe('cutting a long text', () => {
+    const family = '\u{1F468}\u200D\u{1F469}\u200D\u{1F467}\u200D\u{1F466}';
+    const graphemes = (text: string) => Array.from(new Intl.Segmenter(undefined, { granularity: 'grapheme' }).segment(text)).length;
+
+    it('never cuts in the middle of an emoji', () => {
+      const name = normalized({ categories: [rawCategory({ name: family.repeat(MAX_NAME_LENGTH + 20) })], expenses: [] }).categories[0]!.name;
+      expect(name).toBe(family.repeat(MAX_NAME_LENGTH));
+      expect(graphemes(name)).toBe(MAX_NAME_LENGTH);
+    });
+
+    // A corrupt or hostile backup can hold a text of any length. Reading all of it before cutting it
+    // took seconds at a million characters; reading only what is kept takes the same as for a short one.
+    it('reads only as much of the text as it keeps', () => {
+      const original = Intl.Segmenter.prototype.segment;
+      let read = 0;
+      Intl.Segmenter.prototype.segment = function (this: Intl.Segmenter, input: string) {
+        const inner = original.call(this, input);
+        return {
+          [Symbol.iterator]() {
+            const it = inner[Symbol.iterator]();
+            return {
+              next() {
+                const step = it.next();
+                if (!step.done) read++;
+                return step;
+              },
+            };
+          },
+        } as unknown as Intl.Segments;
+      };
+      try {
+        expect(cleanText('x'.repeat(100_000), 30)).toBe('x'.repeat(30));
+        expect(read).toBeLessThanOrEqual(31);
+        read = 0;
+        expect(cleanText(family.repeat(50_000), 30)).toBe(family.repeat(30));
+        expect(read).toBeLessThanOrEqual(31);
+      } finally {
+        Intl.Segmenter.prototype.segment = original;
+      }
+    });
   });
 
   it('uses the injected `today` for repairs and the clock only for missing timestamps', () => {

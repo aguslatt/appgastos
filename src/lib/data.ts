@@ -23,11 +23,25 @@ type Rec = Record<string, unknown>;
 const isRecord = (v: unknown): v is Rec => typeof v === 'object' && v !== null && !Array.isArray(v);
 const segmenter = typeof Intl !== 'undefined' && 'Segmenter' in Intl ? new Intl.Segmenter(undefined, { granularity: 'grapheme' }) : null;
 
-/** Cuts to at most `max` visible characters without splitting an emoji, then trims what is left. */
+/** The visible characters of a text, one at a time, so a caller can stop reading whenever it has enough. */
+function* characters(value: string): Generator<string> {
+  if (segmenter) for (const part of segmenter.segment(value)) yield part.segment;
+  else yield* value;
+}
+
+/**
+ * Cuts to at most `max` visible characters without splitting an emoji. It reads only as far as it
+ * needs to, so a huge text (a corrupt or hostile backup) costs no more than a short one.
+ */
 function truncate(value: string, max: number): string {
   if (value.length <= max) return value;
-  const parts = segmenter ? Array.from(segmenter.segment(value), (x) => x.segment) : Array.from(value);
-  return parts.slice(0, max).join('');
+  let out = '';
+  let count = 0;
+  for (const character of characters(value)) {
+    if (count++ === max) break;
+    out += character;
+  }
+  return out;
 }
 
 export const cleanText = (v: unknown, max: number): string => (typeof v === 'string' ? truncate(v.trim(), max).trim() : '');
