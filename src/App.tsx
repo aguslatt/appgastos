@@ -46,10 +46,10 @@ export default function App() {
 }
 
 function Shell() {
-  const { tab, toast } = useUi();
+  const { tab, toast, entryKind } = useUi();
   const { settings } = useData();
   const status = useStoreStatus();
-  useAppearance(settings.theme, tab);
+  useAppearance(settings.theme, tab, entryKind);
 
   // A new version of the app was installed in the background.
   useEffect(() => {

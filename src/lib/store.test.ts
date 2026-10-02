@@ -1121,6 +1121,33 @@ describe('settings and whole-data operations', () => {
       expect(store.removeDemoExpenses()).toBe(0);
     });
 
+    it('addDemoExpenses cleans each draft the way a reload would, and leaves out what cannot be an expense', () => {
+      const storage = memoryStorage();
+      const { store } = setup({ storage });
+      const created = store.addDemoExpenses([
+        { amount: 0, categoryId: 'super', note: 'zero', date: '2026-10-01' },
+        { amount: 12.4, categoryId: 'super', note: 'fraction', date: '2026-10-01' },
+        { amount: 100, categoryId: 'super', note: 'impossible day', date: '2026-02-30' },
+        { amount: 300, categoryId: 'ghost', note: `  ${'long '.repeat(40)}  `, date: '2026-10-01', extra: 'stray' } as never,
+      ]);
+      // The zero and the impossible date are left out; a fraction of a cent is rounded, as a reload would.
+      expect(created).toBe(2);
+      const [rounded, only] = store.getData().expenses;
+      expect(rounded).toMatchObject({ amount: 12, note: 'fraction', demo: true });
+      expect(only).toMatchObject({ amount: 300, categoryId: 'otros', demo: true });
+      expect(only!.note.length).toBeLessThanOrEqual(80);
+      expect(only).not.toHaveProperty('extra');
+      expect(setup({ storage, prefix: 'b' }).store.getData()).toEqual(store.getData());
+    });
+
+    it('the day-by-day runners ignore a day that is not a date', () => {
+      const { store } = setup();
+      store.addRecurring({ amount: 500, categoryId: 'hogar', day: 1, startMonth: '2026-09' });
+      for (const bad of ['garbage', '2026-13-01', '2026-9-1', '']) expect(store.runRecurring(bad)).toBe(0);
+      expect(store.getData().expenses).toEqual([]);
+      expect(store.getData().recurring[0]?.lastGenerated).toBeNull();
+    });
+
     it('removing demo data leaves no demo data behind after a reload', () => {
       const storage = memoryStorage();
       const { store } = setup({ storage });

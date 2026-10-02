@@ -14,9 +14,9 @@ import { MonthSwitcher } from '../components/MonthSwitcher';
 import { useCountUp } from '../components/useCountUp';
 import { useMonthNav } from '../components/useMonthNav';
 import { useSwipe } from '../components/useSwipe';
-import { addMonths, monthName } from '../lib/dates';
+import { addMonths, formatShortDate, monthName } from '../lib/dates';
 import { monthSignal, totalRequired } from '../lib/goals';
-import { computeMonthIncome, flowSeries, monthBalance, upcomingFixedIncome } from '../lib/income';
+import { computeMonthIncome, flowSeries, monthBalance, nextPaydays, upcomingFixedIncome } from '../lib/income';
 import { incomeSource } from '../lib/incomeSources';
 import { analyzeMonth, buildFacts } from '../lib/insights';
 import type { DateStr } from '../lib/types';
@@ -60,6 +60,7 @@ export function MonthScreen() {
   const flow = useMemo(() => flowSeries(incomesByMonth, byMonth, month, 6), [incomesByMonth, byMonth, month]);
   const showFlow = flow.some((p) => p.income > 0);
   const upcomingIncome = stats.status === 'current' ? upcomingFixedIncome(data.incomeRules, today) : 0;
+  const nextPayday = stats.status === 'current' ? nextPaydays(data.incomeRules, today)[0] : undefined;
   const neverGaveIncome = expected.amount === null && data.incomes.length === 0 && data.incomeRules.length === 0;
 
   const signal = useMemo(
@@ -213,6 +214,17 @@ export function MonthScreen() {
               </p>
             </section>
           </>
+        ) : nextPayday && current && upcomingIncome > 0 ? (
+          <section className="tile tile--wide tile--cta tile--cta-in reveal" style={stagger(tile++)} aria-label="Próximo cobro">
+            <div>
+              <p className="card__title" style={{ marginBottom: 4 }}>
+                Todavía no entró nada este mes
+              </p>
+              <p className="muted">
+                El {formatShortDate(nextPayday.date, locale)} se anotan solos <b>{fmt.formatRounded(upcomingIncome)}</b> de tu ingreso fijo.
+              </p>
+            </div>
+          </section>
         ) : (
           neverGaveIncome &&
           current && (

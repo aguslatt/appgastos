@@ -58,7 +58,7 @@ main.screen:not([hidden]) {
 }
 
 .screen--pad {
-  padding: 14px var(--gutter) calc(var(--nav-total) + 18px);
+  padding: calc(14px + env(safe-area-inset-top, 0px)) var(--gutter) calc(var(--nav-total) + 18px);
 }
 
 .screen__title {
@@ -409,6 +409,7 @@ main.screen:not([hidden]) {
   top: 0;
   max-height: none;
   border-radius: 0;
+  padding-top: env(safe-area-inset-top, 0px);
 }
 
 .sheet__grab {

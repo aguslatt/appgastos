@@ -1,16 +1,17 @@
 import { useEffect, useState } from 'react';
 import type { ThemePref } from '../lib/types';
-import type { Tab } from './ui';
+import type { EntryKind, Tab } from './ui';
 
-/** Applies the chosen theme and keeps the browser's top bar color in step with the screen. */
-export function useAppearance(theme: ThemePref, tab: Tab): void {
+/** Applies the chosen theme and keeps the browser's top bar color in step with the screen (and with the calculator's mode). */
+export function useAppearance(theme: ThemePref, tab: Tab, kind: EntryKind = 'expense'): void {
   useEffect(() => {
     const root = document.documentElement;
     if (theme === 'system') root.removeAttribute('data-theme');
     else root.setAttribute('data-theme', theme);
 
     const apply = () => {
-      const color = getComputedStyle(root).getPropertyValue(tab === 'calc' ? '--panel-bg' : '--bg').trim();
+      const token = tab === 'calc' ? (kind === 'income' ? '--panel-in-bg' : '--panel-bg') : '--bg';
+      const color = getComputedStyle(root).getPropertyValue(token).trim();
       let meta = document.querySelector<HTMLMetaElement>('meta[name="theme-color"][data-dynamic]');
       if (!meta) {
         document.querySelectorAll('meta[name="theme-color"]').forEach((m) => m.remove());
@@ -25,7 +26,7 @@ export function useAppearance(theme: ThemePref, tab: Tab): void {
     const media = window.matchMedia('(prefers-color-scheme: dark)');
     media.addEventListener('change', apply);
     return () => media.removeEventListener('change', apply);
-  }, [theme, tab]);
+  }, [theme, tab, kind]);
 }
 
 /** Tracks the visible viewport so the app shrinks above the on-screen keyboard instead of hiding behind it. */

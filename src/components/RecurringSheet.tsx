@@ -122,7 +122,6 @@ export function RecurringSheet({ id, onClose }: { id: string | 'new'; onClose: (
             <button type="button" role="switch" aria-checked={active} aria-label="Activo" className="switch" onClick={() => setActive((v) => !v)} />
           </div>
         )}
-
       </div>
     </Sheet>
   );

@@ -5,7 +5,7 @@
 }
 
 .history__top {
-  padding: 14px var(--gutter) 8px;
+  padding: calc(14px + env(safe-area-inset-top, 0px)) var(--gutter) 8px;
 }
 
 .history__kinds {
