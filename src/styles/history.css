@@ -1,0 +1,129 @@
+.history {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+}
+
+.history__top {
+  padding: 14px var(--gutter) 8px;
+}
+
+.history__summary {
+  margin-top: 10px;
+  color: var(--muted);
+  font-size: 13.5px;
+  font-weight: 600;
+}
+
+.history__summary strong {
+  color: var(--ink);
+  font-weight: 800;
+}
+
+.history__list {
+  padding: 0 var(--gutter) 32px;
+}
+
+.search {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 48px;
+  padding: 0 14px;
+  border-radius: 999px;
+  background: var(--card);
+  box-shadow: inset 0 0 0 1.5px var(--line);
+  color: var(--muted);
+}
+
+.search:focus-within {
+  box-shadow: inset 0 0 0 2.5px var(--mark);
+}
+
+.search input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: none;
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.search input:focus {
+  outline: none;
+}
+
+.search input::placeholder {
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.search input::-webkit-search-cancel-button {
+  display: none;
+}
+
+.search button {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  color: var(--ink-2);
+}
+
+.chips-row {
+  display: flex;
+  gap: 8px;
+  margin: 10px calc(var(--gutter) * -1) 0;
+  padding: 2px var(--gutter);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.chips-row::-webkit-scrollbar {
+  display: none;
+}
+
+.fchip {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 6px;
+  min-height: 38px;
+  padding: 0 14px;
+  border-radius: 999px;
+  background: var(--card);
+  box-shadow: inset 0 0 0 1.5px var(--line);
+  font-size: 14px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.fchip.is-on {
+  background: var(--ink);
+  color: var(--bg);
+  box-shadow: none;
+}
+
+.day + .day {
+  margin-top: 16px;
+}
+
+.day__head {
+  position: sticky;
+  top: 0;
+  z-index: 4;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin: 0 -4px 6px;
+  padding: 8px 8px 6px;
+  background: var(--bg);
+  color: var(--ink-2);
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.day__head span:last-child {
+  color: var(--muted);
+}

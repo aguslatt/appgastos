@@ -1,0 +1,24 @@
+{
+  "name": "Cuánto: gastos en 2 toques",
+  "short_name": "Cuánto",
+  "description": "Anota tus gastos como en una calculadora y mira cuánto gastas cada mes, con un resumen en historias.",
+  "lang": "es",
+  "dir": "ltr",
+  "start_url": "./",
+  "scope": "./",
+  "id": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#19c65a",
+  "theme_color": "#19c65a",
+  "categories": ["finance", "productivity"],
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "Anotar un gasto", "short_name": "Anotar", "url": "./?tab=calc", "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }] },
+    { "name": "Ver el mes", "short_name": "Mes", "url": "./?tab=month", "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }] }
+  ]
+}

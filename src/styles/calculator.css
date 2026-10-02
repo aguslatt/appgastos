@@ -1,0 +1,458 @@
+.calc {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+/* ---- display panel -------------------------------------------------------------- */
+
+.calc__panel {
+  position: relative;
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 214px;
+  padding: 14px var(--gutter) 16px;
+  border-radius: 0 0 var(--r-xl) var(--r-xl);
+  background: var(--panel-bg);
+  color: var(--panel-ink);
+  overflow: hidden;
+}
+
+.calc__panel::before {
+  content: '';
+  position: absolute;
+  top: -70px;
+  right: -60px;
+  width: 210px;
+  height: 210px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--panel-ink) 7%, transparent);
+  pointer-events: none;
+}
+
+.calc__panel > * {
+  position: relative;
+}
+
+.calc__top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.calc__promo {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 6px;
+  min-height: 40px;
+  padding: 0 14px;
+  border-radius: 999px;
+  background: var(--accent-2);
+  color: var(--accent-ink);
+  font-size: 14px;
+  font-weight: 800;
+  animation: pop 0.3s cubic-bezier(0.3, 1.6, 0.5, 1);
+}
+
+.calc__month {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 0 12px 0 16px;
+  border-radius: 999px;
+  background: var(--panel-field);
+  color: var(--panel-ink);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.calc__month strong {
+  font-weight: 800;
+}
+
+.calc__display {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: center;
+  min-height: 0;
+  padding: 4px 2px;
+  text-align: right;
+  container-type: inline-size;
+}
+
+.calc__expr {
+  max-width: 100%;
+  min-height: 24px;
+  overflow: hidden;
+  color: var(--panel-ink-2);
+  font-size: 19px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.calc__amount {
+  display: flex;
+  align-items: baseline;
+  justify-content: flex-end;
+  gap: 8px;
+  max-width: 100%;
+}
+
+.calc__cur {
+  color: var(--panel-ink-2);
+  font-size: 30px;
+  font-weight: 700;
+}
+
+.calc__num {
+  /* fits the width of the display and never takes more than ~10% of the screen height */
+  font-size: clamp(34px, min(calc((100cqw - 40px) / (var(--n, 5) * 0.56)), 9.5vh), 80px);
+  font-size: clamp(34px, min(calc((100cqw - 40px) / (var(--n, 5) * 0.56)), 9.5dvh), 80px);
+  font-weight: 800;
+  letter-spacing: -0.035em;
+  line-height: 1.02;
+  white-space: nowrap;
+}
+
+.calc__amount.is-shaking {
+  animation: shake 0.32s ease;
+}
+
+@keyframes shake {
+  20% {
+    transform: translateX(-9px);
+  }
+  40% {
+    transform: translateX(8px);
+  }
+  60% {
+    transform: translateX(-5px);
+  }
+  80% {
+    transform: translateX(3px);
+  }
+}
+
+.calc__concept {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.calc__input {
+  flex: 1;
+  min-width: 0;
+  min-height: 50px;
+  padding: 0 18px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--panel-field);
+  color: var(--panel-ink);
+  font-weight: 700;
+}
+
+.calc__input::placeholder {
+  color: var(--panel-ink-2);
+  font-weight: 600;
+}
+
+.calc__input:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 2.5px var(--panel-ink);
+}
+
+.calc__mic {
+  position: relative;
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  background: var(--panel-ink);
+  color: var(--panel-bg);
+}
+
+.calc__mic.is-on {
+  background: var(--bad);
+  color: #1c0502;
+  animation: ring 1.2s ease-out infinite;
+}
+
+@keyframes ring {
+  from {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--bad) 55%, transparent);
+  }
+  to {
+    box-shadow: 0 0 0 16px transparent;
+  }
+}
+
+.calc__live {
+  min-height: 20px;
+  margin-top: 10px;
+  color: var(--panel-ink-2);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.calc__live[data-tone='warn'] {
+  color: var(--panel-ink);
+}
+
+.calc__live[data-tone='over'] {
+  display: inline-block;
+  align-self: flex-start;
+  min-height: 0;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: var(--bad);
+  color: #1c0502;
+}
+
+.calc__live[data-tone='warn']::before {
+  content: '';
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 8px;
+  border-radius: 50%;
+  background: var(--accent-2);
+  box-shadow: 0 0 0 2px var(--panel-ink);
+}
+
+/* ---- folder pills -------------------------------------------------------------- */
+
+.calc__pills {
+  display: flex;
+  flex: none;
+  gap: 8px;
+  padding: 14px var(--gutter) 6px;
+  overflow-x: auto;
+  scroll-snap-type: x proximity;
+  scroll-padding-left: var(--gutter);
+  scrollbar-width: none;
+  -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent);
+  mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent);
+}
+
+.calc__pills::-webkit-scrollbar {
+  display: none;
+}
+
+.calc__pills.is-nudged {
+  animation: nudge 0.5s ease;
+}
+
+@keyframes nudge {
+  25% {
+    transform: translateX(-8px);
+  }
+  50% {
+    transform: translateX(8px);
+  }
+  75% {
+    transform: translateX(-4px);
+  }
+}
+
+.pill--date {
+  --pill-color: var(--muted);
+  background: var(--card);
+}
+
+.pill--date.is-set {
+  background: var(--ink);
+  color: var(--bg);
+  box-shadow: none;
+}
+
+/* ---- keypad -------------------------------------------------------------------------- */
+
+.calc__pad {
+  display: grid;
+  flex: none;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  padding: 8px var(--gutter) 14px;
+}
+
+.key {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  height: clamp(50px, 7.4vh, 66px);
+  height: clamp(50px, 7.4dvh, 66px);
+  border-radius: 22px;
+  background: var(--key-bg);
+  color: var(--key-ink);
+  box-shadow: var(--shadow-1);
+  font-size: 27px;
+  font-weight: 700;
+  transition: transform 0.08s ease, filter 0.08s ease;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.key:active {
+  transform: scale(0.93);
+  filter: brightness(0.94);
+}
+
+.key--op {
+  background: var(--key-op-bg);
+  color: var(--key-op-ink);
+  font-size: 30px;
+}
+
+.key--fn {
+  background: var(--key-fn-bg);
+  font-size: 19px;
+  font-weight: 800;
+}
+
+.key--go {
+  grid-column: span 2;
+  background: var(--key-go-bg);
+  color: var(--key-go-ink);
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.key--go[aria-disabled='true'] {
+  opacity: 0.5;
+}
+
+.key__go-text {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  line-height: 1.15;
+  min-width: 0;
+}
+
+.key__sub {
+  max-width: 100%;
+  overflow: hidden;
+  font-size: 12px;
+  font-weight: 700;
+  opacity: 0.8;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* While typing a concept the phone keyboard needs the room. */
+.calc--typing .calc__pad {
+  display: none;
+}
+
+.calc--typing .calc__panel {
+  flex: 0 0 auto;
+  min-height: 0;
+}
+
+.calc--typing .calc__display {
+  flex: none;
+}
+
+.calc--edit .calc__panel {
+  border-radius: var(--r-l);
+  margin: 0 var(--gutter);
+  padding-top: 18px;
+}
+
+.calc--edit .calc__panel::before {
+  display: none;
+}
+
+.calc--edit {
+  overflow-y: auto;
+}
+
+.calc__footer {
+  padding: 0 var(--gutter) 14px;
+}
+
+/* Short screens (small phones, or a browser with its own bars): tighten everything so the whole calculator still fits. */
+@media (max-height: 760px) {
+  .calc__panel {
+    min-height: 0;
+    padding: 10px var(--gutter) 12px;
+  }
+
+  .calc__month,
+  .calc__promo {
+    min-height: 34px;
+  }
+
+  .calc__expr {
+    min-height: 20px;
+    font-size: 17px;
+  }
+
+  .calc__cur {
+    font-size: 24px;
+  }
+
+  .calc__concept {
+    margin-top: 4px;
+  }
+
+  .calc__input {
+    min-height: 44px;
+  }
+
+  .calc__mic {
+    width: 44px;
+    height: 44px;
+  }
+
+  .calc__live {
+    min-height: 18px;
+    margin-top: 6px;
+    font-size: 13px;
+  }
+
+  .calc__pills {
+    padding-top: 10px;
+    padding-bottom: 4px;
+  }
+
+  .calc__pills .pill {
+    min-height: 40px;
+  }
+
+  .calc__pad {
+    gap: 8px;
+    padding: 6px var(--gutter) 10px;
+  }
+
+  .key {
+    height: clamp(42px, 6.3vh, 56px);
+    height: clamp(42px, 6.3dvh, 56px);
+    border-radius: 18px;
+    font-size: 24px;
+  }
+
+  .key--op {
+    font-size: 27px;
+  }
+
+  .key--go {
+    font-size: 17px;
+  }
+
+  .tab {
+    min-height: 48px;
+  }
+}
