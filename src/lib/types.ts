@@ -37,6 +37,37 @@ export interface Expense {
   demo?: boolean;
 }
 
+/** Money that came in: a payment from a client, a sale, one month's salary. */
+export interface Income {
+  id: string;
+  amount: Cents;
+  /** One of the fixed sources (see `incomeSources.ts`). */
+  sourceId: string;
+  note: string;
+  date: DateStr;
+  createdAt: number;
+  updatedAt: number;
+  /** Set when the income was generated from a fixed-income rule (a salary). */
+  ruleId?: string;
+  /** Sample data, removable without touching real entries. */
+  demo?: boolean;
+}
+
+/** A fixed income that arrives every month (a salary): set once, recorded by itself on its day. */
+export interface IncomeRule {
+  id: string;
+  amount: Cents;
+  sourceId: string;
+  note: string;
+  /** Day of the month, 1-31 (clamped to the month's length). */
+  day: number;
+  /** First month the rule applies to. */
+  startMonth: MonthKey;
+  /** Last month already recorded (or deliberately skipped). */
+  lastGenerated: MonthKey | null;
+  active: boolean;
+}
+
 /** A monthly fixed expense (rent, subscriptions...). */
 export interface Recurring {
   id: string;
@@ -106,7 +137,10 @@ export interface Settings {
   currency: string;
   locale: string;
   monthlyBudget: Cents | null;
-  /** Optional; only used to express a purchase as hours of work. */
+  /**
+   * A rough monthly income for people who don't want to record theirs. Real incomes and fixed
+   * incomes take over as soon as there are any; this is only the fallback.
+   */
   monthlyIncome: Cents | null;
   /** Units of the app currency per US dollar; used to price trips quoted in dollars. */
   fxRate: number | null;
@@ -120,6 +154,8 @@ export interface AppData {
   expenses: Expense[];
   categories: Category[];
   recurring: Recurring[];
+  incomes: Income[];
+  incomeRules: IncomeRule[];
   goals: Goal[];
   settings: Settings;
 }

@@ -1,4 +1,5 @@
 import { Calculator, LayoutGrid, ReceiptText, Settings, Target, type LucideIcon } from 'lucide-react';
+import type { CSSProperties } from 'react';
 import { useUi, type Tab } from '../state/ui';
 
 export const TABS: Array<{ id: Tab; label: string; Icon: LucideIcon }> = [
@@ -9,10 +10,12 @@ export const TABS: Array<{ id: Tab; label: string; Icon: LucideIcon }> = [
   { id: 'settings', label: 'Ajustes', Icon: Settings },
 ];
 
+/** A floating bar; the highlight behind the current tab slides over to the next one (`--i` is its index). */
 export function TabBar() {
   const { tab, setTab, haptic } = useUi();
+  const index = Math.max(0, TABS.findIndex((t) => t.id === tab));
   return (
-    <nav className="tabbar" aria-label="Secciones">
+    <nav className="tabbar" aria-label="Secciones" style={{ '--i': index } as CSSProperties}>
       {TABS.map(({ id, label, Icon }) => (
         <button
           key={id}

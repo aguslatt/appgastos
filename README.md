@@ -1,18 +1,20 @@
 # Cuánto
 
-App para anotar gastos **como en una calculadora** y ver, de un vistazo, **cuánto gastás** cada mes. Funciona en el celular (se instala como una app), no necesita internet ni cuentas, y guarda todo en el propio teléfono.
+App para anotar gastos **como en una calculadora** y ver, de un vistazo, **cuánto gastás** y **cuánto te queda** cada mes. Funciona en el celular (se instala como una app), no necesita internet ni cuentas, y guarda todo en el propio teléfono.
 
 ## Qué hace
 
 - **Inicio = calculadora.** Se abre lista para tipear. Un monto, un toque en una carpeta y el gasto queda guardado (con "Deshacer"). Hay operadores de verdad: `÷` para dividir la cuenta, `%` para sumar la propina (`25000 + 10%`).
+- **Ingresos, para quien cobra de cualquier forma.** Arriba de la calculadora hay un interruptor **Gasto | Ingreso**: al pasar a *Ingreso* el panel se pone azul y los botones pasan a ser tipos de ingreso (sueldo, freelance, ventas, regalo, reintegro, inversiones). Si **cobrás por trabajo** (freelance, changas, ventas), anotás cada ingreso cuando te entra y la app adivina el tipo por lo que escribís (`cliente logo`, `vendí la bici`). Si **cobrás un sueldo fijo**, lo cargás **una sola vez** (monto y día de cobro) y se anota solo todos los meses; si cambia, lo editás y los meses que vienen usan el nuevo valor. También se puede dar solo un número aproximado, para quien prefiere no anotar nada.
 - **Carpetas con IA en el teléfono.** Escribí o dictá "propina", "uber", "farmacia"… y la app elige la carpeta. Entiende jerga, marcas y errores de tipeo, y **aprende** cuando la corregís. También entiende frases enteras: `uber 4500 ayer`, `tres mil quinientos propina`, `2 lucas el súper`.
 - **Contexto en vivo.** Mientras tipeás muestra qué porcentaje del presupuesto es, cuánto queda por día, si pasa el tope de la carpeta y (opcional) cuántas horas de trabajo cuesta.
-- **Mes.** Total gastado, comparación con el mes anterior *a la misma altura*, presupuesto con medidor, cierre estimado, calendario de calor día por día, desglose por carpeta y datos curiosos.
-- **Resumen en historias.** A fin de mes (o cuando quieras) un recorrido de slides: "¿ahorrando o sabotándote?", carpeta estrella, el gasto más grande, tu hábito del mes, tu día más caro, días sin gastar y lo que viene.
-- **Pagos fijos** (alquiler, servicios, suscripciones) que se anotan solos el día que corresponde.
-- **Metas.** Un viaje (destinos, días, personas, estilo), una mudanza (zona, alquiler, depósito y costos de entrada) u otra cosa que quieras juntar. Te dice cuánto guardar por mes y lo compara con tu ingreso y tu forma real de gastar: *vas bien*, *justo* o *no alcanza* (con recortes sugeridos o una fecha más lejana). En **Mes** se ve si el ritmo actual deja guardar lo que piden tus metas.
+- **Mes.** Total gastado con un gráfico de cómo se fue armando día a día (y hacia dónde va), comparación con el mes anterior *a la misma altura*, **cuánto entró y cuánto te queda** (con un anillo de cuánto ahorrás), **entró vs. salió** de los últimos seis meses, presupuesto con medidor, cierre estimado, calendario de calor, desglose por carpeta en un anillo y datos curiosos. Se cambia de mes con las flechas o **deslizando el dedo**.
+- **Resumen en historias.** A fin de mes (o cuando quieras) un recorrido de slides: "¿ahorrando o sabotándote?", lo que entró y lo que te quedó, carpeta estrella, el gasto más grande, tu hábito del mes, tu día más caro, días sin gastar y lo que viene.
+- **Pagos fijos** (alquiler, servicios, suscripciones) e **ingresos fijos** (sueldo) que se anotan solos el día que corresponde.
+- **Metas.** Un viaje (destinos, días, personas, estilo), una mudanza (zona, alquiler, depósito y costos de entrada) u otra cosa que quieras juntar. Te dice cuánto guardar por mes y lo compara con tu ingreso (el sueldo fijo más el promedio de lo que suele entrar por trabajo en los últimos meses) y tu forma real de gastar: *vas bien*, *justo* o *no alcanza* (con recortes sugeridos o una fecha más lejana). En **Mes** se ve si el ritmo actual deja guardar lo que piden tus metas.
 - **IA con búsqueda en internet (opcional).** Con tu propia clave de Anthropic, la meta de viaje o de mudanza busca precios de ahora (pasajes, un día en cada destino, alquileres y expensas de la zona) y completa los datos. Sin clave, todo sigue funcionando con estimaciones de referencia.
-- **Historial** con búsqueda y filtros, copia de seguridad, exportar a planilla (CSV), tema claro/oscuro.
+- **Historial** de gastos e ingresos juntos, con búsqueda y filtros (todo, solo gastos, solo ingresos), copia de seguridad, exportar a planilla (CSV, con una columna *Tipo*), tema claro/oscuro.
+- **Diseño** pensado para el celular: barra de navegación flotante, hojas que se arrastran hacia abajo para cerrar, gráficos que se dibujan al aparecer, y movimiento que se apaga solo si el teléfono pide menos animaciones. El verde es la marca y significa *gasto*; el azul significa *ingreso* (los dos están validados para que se distingan también con daltonismo).
 
 ## IA con búsqueda en internet (opcional)
 
@@ -55,17 +57,17 @@ npm run preview    # sirve dist/ para probar la instalación y el modo offline
 ### Estructura
 
 ```
-src/lib        lógica pura y testeada (calc, classifier, phrase, stats, insights, goals, trips, store…)
+src/lib        lógica pura y testeada (calc, classifier, phrase, stats, insights, goals, trips, income, store…)
 src/lib/ai     la IA opcional: consulta con el SDK de Anthropic, prompts, validación de respuestas, errores
 src/state      store local, hooks y estado de la interfaz
 src/components piezas de interfaz (calculadora, hojas, gráficos, historias)
-src/screens    Anotar, Mes, Historial, Ajustes
+src/screens    Anotar, Mes, Metas, Historial, Ajustes
 src/styles     tokens de diseño (claro/oscuro) y estilos
 scripts        plugin que genera el service worker en el build
 public         manifiesto e íconos
 ```
 
-Las decisiones de diseño (paleta verde, tipografía Plus Jakarta Sans embebida para funcionar sin internet) están en `src/styles/tokens.css`; un test verifica el contraste de color en claro y oscuro.
+Las decisiones de diseño (paleta verde y azul, tipografía Plus Jakarta Sans embebida para funcionar sin internet) están en `src/styles/tokens.css`; un test verifica el contraste de color en claro y oscuro, incluidos los textos que van sobre degradados.
 
 ### Cambiar el nombre
 

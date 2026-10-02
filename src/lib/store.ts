@@ -17,9 +17,10 @@ import {
 } from './data';
 import { addMonths, isValidDateStr, isValidMonthKey, monthKeyOf, todayStr } from './dates';
 import { mergeData, type MergeResult } from './backup';
+import { resolveIncomeSource } from './incomeSources';
 import { isSupportedCurrency } from './money';
-import { planRecurring } from './recurring';
-import type { AppData, Category, Cents, DateStr, Expense, Goal, GoalKind, MonthKey, MovePlan, Recurring, Settings, TripPlan } from './types';
+import { planRecurring, planSchedule } from './recurring';
+import type { AppData, Category, Cents, DateStr, Expense, Goal, GoalKind, Income, IncomeRule, MonthKey, MovePlan, Recurring, Settings, TripPlan } from './types';
 
 export interface StorageLike {
   getItem(key: string): string | null;
@@ -48,6 +49,21 @@ export interface NewExpense {
 export interface NewRecurring {
   amount: Cents;
   categoryId: string;
+  note?: string;
+  day: number;
+  startMonth: MonthKey;
+}
+
+export interface NewIncome {
+  amount: Cents;
+  sourceId: string;
+  note?: string;
+  date: DateStr;
+}
+
+export interface NewIncomeRule {
+  amount: Cents;
+  sourceId: string;
   note?: string;
   day: number;
   startMonth: MonthKey;
@@ -119,6 +135,15 @@ function shapeGoal(f: GoalFields): Goal {
 
 /** The later of two months; `null` counts as "never". */
 const laterMonth = (a: MonthKey | null, b: MonthKey): MonthKey => (a !== null && a > b ? a : b);
+
+/**
+ * A paused rule picks up from this month when it is resumed: the months it was paused are not paid
+ * back. Returns what `lastGenerated` should become, or nothing to leave it as it is.
+ */
+function resumedFields(rule: { active: boolean; startMonth: MonthKey; lastGenerated: MonthKey | null }, wantsActive: boolean | undefined, resumeFrom: MonthKey): { lastGenerated?: MonthKey } {
+  const resumed = wantsActive === true && !rule.active;
+  return resumed && resumeFrom >= rule.startMonth ? { lastGenerated: laterMonth(rule.lastGenerated, resumeFrom) } : {};
+}
 
 export function createStore(options: StoreOptions = {}) {
   const storage = options.storage ?? null;
@@ -332,20 +357,19 @@ export function createStore(options: StoreOptions = {}) {
       const resumeFrom = addMonths(monthKeyOf(today ?? todayStr(new Date(now()))), -1);
       commit({
         ...data,
-        recurring: data.recurring.map((r) => {
-          if (r.id !== id) return r;
-          // A paused rule picks up from this month: the months it was paused are not paid back.
-          const resumed = patch.active === true && !r.active;
-          return {
-            ...r,
-            ...(patch.active !== undefined && { active: patch.active === true }),
-            ...(amount !== undefined && { amount }),
-            ...(patch.categoryId !== undefined && { categoryId: categoryIdOrFallback(patch.categoryId) }),
-            ...(patch.note !== undefined && { note: cleanNote(patch.note) }),
-            ...(patch.day !== undefined && { day: clampDay(patch.day) }),
-            ...(resumed && resumeFrom >= r.startMonth && { lastGenerated: laterMonth(r.lastGenerated, resumeFrom) }),
-          };
-        }),
+        recurring: data.recurring.map((r) =>
+          r.id !== id
+            ? r
+            : {
+                ...r,
+                ...(patch.active !== undefined && { active: patch.active === true }),
+                ...(amount !== undefined && { amount }),
+                ...(patch.categoryId !== undefined && { categoryId: categoryIdOrFallback(patch.categoryId) }),
+                ...(patch.note !== undefined && { note: cleanNote(patch.note) }),
+                ...(patch.day !== undefined && { day: clampDay(patch.day) }),
+                ...resumedFields(r, patch.active, resumeFrom),
+              },
+        ),
       });
     },
 
@@ -355,6 +379,7 @@ export function createStore(options: StoreOptions = {}) {
 
     /** Creates the fixed expenses that came due; safe to call as often as you like. Returns how many were created. */
     runRecurring(today: DateStr = todayStr()): number {
+      if (!isValidDateStr(today)) return 0;
       const plan = planRecurring(data.recurring, today);
       const changed = plan.rules.some((r, i) => r !== data.recurring[i]);
       if (!changed) return 0;
@@ -370,6 +395,123 @@ export function createStore(options: StoreOptions = {}) {
         recurringId: d.ruleId,
       }));
       commit({ ...data, recurring: plan.rules, expenses: [...data.expenses, ...created] });
+      return created.length;
+    },
+
+    // ---- incomes
+    addIncome(input: NewIncome): Income {
+      if (!Number.isSafeInteger(input.amount) || input.amount <= 0) throw new Error('Invalid amount');
+      if (!isValidDateStr(input.date)) throw new Error('Invalid date');
+      const t = now();
+      const income: Income = {
+        id: makeId(),
+        amount: input.amount,
+        sourceId: resolveIncomeSource(input.sourceId),
+        note: cleanNote(input.note),
+        date: input.date,
+        createdAt: t,
+        updatedAt: t,
+      };
+      commit({ ...data, incomes: [...data.incomes, income] });
+      return income;
+    },
+
+    updateIncome(id: string, patch: Partial<Pick<Income, 'amount' | 'sourceId' | 'note' | 'date'>>): Income | null {
+      const current = data.incomes.find((i) => i.id === id);
+      if (!current) return null;
+      if (patch.amount !== undefined && (!Number.isSafeInteger(patch.amount) || patch.amount <= 0)) throw new Error('Invalid amount');
+      if (patch.date !== undefined && !isValidDateStr(patch.date)) throw new Error('Invalid date');
+      const updated: Income = {
+        ...current,
+        ...(patch.amount !== undefined && { amount: patch.amount }),
+        ...(patch.sourceId !== undefined && { sourceId: resolveIncomeSource(patch.sourceId) }),
+        ...(patch.note !== undefined && { note: cleanNote(patch.note) }),
+        ...(patch.date !== undefined && { date: patch.date }),
+        updatedAt: now(),
+      };
+      commit({ ...data, incomes: data.incomes.map((i) => (i.id === id ? updated : i)) });
+      return updated;
+    },
+
+    deleteIncome(id: string): Income | null {
+      const current = data.incomes.find((i) => i.id === id);
+      if (!current) return null;
+      commit({ ...data, incomes: data.incomes.filter((i) => i.id !== id) });
+      return current;
+    },
+
+    /** Puts back an income removed by `deleteIncome` (undo). */
+    restoreIncome(income: Income) {
+      if (data.incomes.some((i) => i.id === income.id)) return;
+      commit({ ...data, incomes: [...data.incomes, { ...income, sourceId: resolveIncomeSource(income.sourceId) }] });
+    },
+
+    // ---- fixed incomes (a salary): set once, recorded by themselves
+    addIncomeRule(input: NewIncomeRule): IncomeRule {
+      const amount = positiveCents(input.amount);
+      if (amount === null) throw new Error('Invalid amount');
+      if (!isValidMonthKey(input.startMonth)) throw new Error('Invalid month');
+      const rule: IncomeRule = {
+        id: makeId(),
+        amount,
+        sourceId: resolveIncomeSource(input.sourceId),
+        note: cleanNote(input.note),
+        day: clampDay(input.day),
+        startMonth: input.startMonth,
+        lastGenerated: null,
+        active: true,
+      };
+      commit({ ...data, incomeRules: [...data.incomeRules, rule] });
+      return rule;
+    },
+
+    /** `today` is only used when a paused rule is resumed (it defaults to the clock's day). */
+    updateIncomeRule(id: string, patch: Partial<Pick<IncomeRule, 'amount' | 'sourceId' | 'note' | 'day' | 'active'>>, today?: DateStr) {
+      const amount = patch.amount === undefined ? undefined : positiveCents(patch.amount);
+      if (amount === null) throw new Error('Invalid amount');
+      if (!data.incomeRules.some((r) => r.id === id)) return;
+      const resumeFrom = addMonths(monthKeyOf(today ?? todayStr(new Date(now()))), -1);
+      commit({
+        ...data,
+        incomeRules: data.incomeRules.map((r) =>
+          r.id !== id
+            ? r
+            : {
+                ...r,
+                ...(patch.active !== undefined && { active: patch.active === true }),
+                ...(amount !== undefined && { amount }),
+                ...(patch.sourceId !== undefined && { sourceId: resolveIncomeSource(patch.sourceId) }),
+                ...(patch.note !== undefined && { note: cleanNote(patch.note) }),
+                ...(patch.day !== undefined && { day: clampDay(patch.day) }),
+                ...resumedFields(r, patch.active, resumeFrom),
+              },
+        ),
+      });
+    },
+
+    deleteIncomeRule(id: string) {
+      if (!data.incomeRules.some((r) => r.id === id)) return;
+      commit({ ...data, incomeRules: data.incomeRules.filter((r) => r.id !== id) });
+    },
+
+    /** Records the fixed incomes that came due; safe to call as often as you like. Returns how many were recorded. */
+    runIncomeRules(today: DateStr = todayStr()): number {
+      if (!isValidDateStr(today)) return 0;
+      const plan = planSchedule(data.incomeRules, today);
+      const changed = plan.rules.some((r, i) => r !== data.incomeRules[i]);
+      if (!changed) return 0;
+      const t = now();
+      const created: Income[] = plan.due.map(({ rule, date }) => ({
+        id: makeId(),
+        amount: rule.amount,
+        sourceId: rule.sourceId,
+        note: rule.note,
+        date,
+        createdAt: t,
+        updatedAt: t,
+        ruleId: rule.id,
+      }));
+      commit({ ...data, incomeRules: plan.rules, incomes: [...data.incomes, ...created] });
       return created.length;
     },
 
@@ -464,9 +606,16 @@ export function createStore(options: StoreOptions = {}) {
       return result;
     },
 
+    /** Sample expenses, cleaned the way a reload would clean them: anything unusable is left out. */
     addDemoExpenses(drafts: Array<Omit<Expense, 'id' | 'createdAt' | 'updatedAt' | 'demo'>>): number {
       const t = now();
-      const created: Expense[] = drafts.map((d, i) => ({ ...d, id: makeId(), createdAt: t + i, updatedAt: t + i, demo: true }));
+      const created: Expense[] = [];
+      for (const d of drafts) {
+        const amount = positiveCents(d.amount);
+        if (amount === null || !isValidDateStr(d.date)) continue;
+        const at = t + created.length;
+        created.push({ id: makeId(), amount, categoryId: categoryIdOrFallback(d.categoryId), note: cleanNote(d.note), date: d.date, createdAt: at, updatedAt: at, demo: true });
+      }
       commit({ ...data, expenses: [...data.expenses, ...created], settings: { ...data.settings, onboarded: true } });
       return created.length;
     },
@@ -475,6 +624,27 @@ export function createStore(options: StoreOptions = {}) {
       const kept = data.expenses.filter((e) => !e.demo);
       const removed = data.expenses.length - kept.length;
       if (removed > 0) commit({ ...data, expenses: kept });
+      return removed;
+    },
+
+    /** Sample incomes, cleaned the way a reload would clean them: anything unusable is left out. */
+    addDemoIncomes(drafts: Array<Omit<Income, 'id' | 'createdAt' | 'updatedAt' | 'demo' | 'ruleId'>>): number {
+      const t = now();
+      const created: Income[] = [];
+      for (const d of drafts) {
+        const amount = positiveCents(d.amount);
+        if (amount === null || !isValidDateStr(d.date)) continue;
+        const at = t + created.length;
+        created.push({ id: makeId(), amount, sourceId: resolveIncomeSource(d.sourceId), note: cleanNote(d.note), date: d.date, createdAt: at, updatedAt: at, demo: true });
+      }
+      commit({ ...data, incomes: [...data.incomes, ...created], settings: { ...data.settings, onboarded: true } });
+      return created.length;
+    },
+
+    removeDemoIncomes(): number {
+      const kept = data.incomes.filter((i) => !i.demo);
+      const removed = data.incomes.length - kept.length;
+      if (removed > 0) commit({ ...data, incomes: kept });
       return removed;
     },
 

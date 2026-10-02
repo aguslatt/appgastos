@@ -1,6 +1,6 @@
 {
   "name": "appgastos",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "private": true,
   "type": "module",
   "description": "Registro de gastos personal: rápido de cargar y claro para ver cuánto gastás.",

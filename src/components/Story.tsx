@@ -3,6 +3,8 @@ import { useEffect, useMemo, useRef, useState, type CSSProperties, type PointerE
 import { createPortal } from 'react-dom';
 import { colorVar } from '../lib/categories';
 import { weekdayInitial } from '../lib/dates';
+import { computeMonthIncome } from '../lib/income';
+import { incomeSource } from '../lib/incomeSources';
 import { analyzeMonth, buildStory, plainTitle, shareText, verdictFor } from '../lib/insights';
 import { useFmt, useToday } from '../state/derived';
 import { useOverlayHistory } from '../state/overlay';
@@ -64,7 +66,14 @@ function Story({ month, onClose }: { month: string; onClose: () => void }) {
     () => analyzeMonth({ month, today, expenses: data.expenses, categories: data.categories, recurring: data.recurring, budget: data.settings.monthlyBudget }),
     [month, today, data.expenses, data.categories, data.recurring, data.settings.monthlyBudget],
   );
-  const ctx = useMemo(() => ({ analysis, fmt, locale }), [analysis, fmt, locale]);
+  const income = useMemo(() => {
+    const month_ = computeMonthIncome(data.incomes, month);
+    return {
+      total: month_.total,
+      bySource: month_.bySource.map((s) => ({ ...incomeSource(s.sourceId), total: s.total, share: s.share })),
+    };
+  }, [data.incomes, month]);
+  const ctx = useMemo(() => ({ analysis, fmt, locale, income }), [analysis, fmt, locale, income]);
   const slides = useMemo(() => buildStory(ctx), [ctx]);
   const [index, setIndex] = useState(0);
   const slide = slides[index] ?? slides[0];
@@ -164,7 +173,7 @@ function Story({ month, onClose }: { month: string; onClose: () => void }) {
           {slide.items && (
             <ul className="story__chips">
               {slide.items.map((it, i) => (
-                <li key={it.label} style={{ '--tilt': `${TILTS[i % TILTS.length]}deg`, '--dot': colorVar(it.color ?? 'slate') } as CSSProperties}>
+                <li key={it.label} style={{ '--tilt': `${TILTS[i % TILTS.length]}deg`, '--dot': colorVar(it.color ?? 'slate'), '--k': i } as CSSProperties}>
                   <span aria-hidden="true">{it.emoji}</span>
                   <span className="story__chip-label">{it.label}</span>
                   <b>{it.value}</b>

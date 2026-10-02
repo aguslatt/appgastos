@@ -1,7 +1,8 @@
 import { addMonths, dateInMonth, dayOf, daysInMonth, monthKeyOf, weekdayMon0 } from './dates';
-import type { Category, Cents, DateStr, Expense } from './types';
+import type { Category, Cents, DateStr, Expense, Income } from './types';
 
 export type DemoDraft = Omit<Expense, 'id' | 'createdAt' | 'updatedAt' | 'demo'>;
+export type DemoIncomeDraft = Omit<Income, 'id' | 'createdAt' | 'updatedAt' | 'demo' | 'ruleId'>;
 
 /** Rough units of each currency per US dollar, only to make sample amounts look plausible. */
 const PER_USD: Record<string, number> = {
@@ -90,6 +91,39 @@ export function generateDemo(opts: { today: DateStr; currency: string; categorie
       if (rnd() < 0.025) add(day, 'compras', pick(['Ropa', 'Mercado Libre', 'Zapatillas']), between(18, 65));
       if (rnd() < 0.02) add(day, 'mascotas', 'Veterinario', between(18, 35));
     }
+  }
+  return out;
+}
+
+/**
+ * A salary on the 5th and a few freelance jobs a month for the same stretch as `generateDemo`, so the
+ * income screens (balance, income against spending, the month story) have something to show too.
+ * Some months come out tighter than others on purpose.
+ */
+export function generateDemoIncomes(opts: { today: DateStr; currency: string; seed?: number }): DemoIncomeDraft[] {
+  const rnd = mulberry32((opts.seed ?? 7) + 101);
+  const perUsd = PER_USD[opts.currency] ?? 1;
+  const between = (lo: number, hi: number): number => lo + rnd() * (hi - lo);
+  const pick = <T,>(list: readonly T[]): T => list[Math.floor(rnd() * list.length)] as T;
+  const money = (usd: number): Cents => Math.round(nice(usd * perUsd) * 100);
+
+  const out: DemoIncomeDraft[] = [];
+  const currentMonth = monthKeyOf(opts.today);
+
+  for (let month = addMonths(currentMonth, -3); month <= currentMonth; month = addMonths(month, 1)) {
+    const lastDay = month === currentMonth ? dayOf(opts.today) : daysInMonth(month);
+    const add = (day: number, sourceId: string, note: string, usd: number) => {
+      if (day < 1 || day > lastDay) return;
+      const amount = money(usd);
+      if (amount > 0) out.push({ amount, sourceId, note, date: dateInMonth(month, day) });
+    };
+
+    add(5, 'sueldo', 'Sueldo', 1000);
+    const jobs = pick([1, 2, 2, 3]);
+    const clients = ['Cliente Martín', 'Logo para un café', 'Landing page', 'Clase particular', 'Diseño de flyer', 'Edición de video'];
+    for (let i = 0; i < jobs; i++) add(Math.round(between(8, 27)), 'freelance', pick(clients), between(130, 520));
+    if (rnd() < 0.4) add(Math.round(between(10, 24)), 'venta', 'Vendí la bici', between(70, 120));
+    if (rnd() < 0.25) add(Math.round(between(10, 24)), 'regalo', 'Cumple', between(30, 60));
   }
   return out;
 }

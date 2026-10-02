@@ -61,8 +61,8 @@ export function describeGoal(goal: Goal, status: GoalStatus, capacity: Capacity,
         headline: `Necesitas guardar ${perMonth} por mes hasta ${when}.`,
         detail:
           capacity.avgSpend !== null && capacity.avgSpend > 0
-            ? `Es el ${pct(status.requiredPerMonth / capacity.avgSpend)} de lo que gastas por mes. Con tu ingreso en Ajustes te digo si llegas.${behind}`
-            : `Con tu ingreso en Ajustes y unos meses de gastos te digo si llegas.${behind}`,
+            ? `Es el ${pct(status.requiredPerMonth / capacity.avgSpend)} de lo que gastas por mes. Si me cuentas tus ingresos te digo si llegas.${behind}`
+            : `Con tus ingresos y unos meses de gastos te digo si llegas.${behind}`,
       };
   }
 }

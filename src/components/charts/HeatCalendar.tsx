@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, type CSSProperties } from 'react';
 import { dateInMonth, monthName, weekdayInitial, weekdayMon0 } from '../../lib/dates';
 import { heatLevels } from '../../lib/heat';
 import type { MoneyFormatter } from '../../lib/money';
@@ -41,6 +41,7 @@ export function HeatCalendar({ month, byDay, today, locale, fmt, onPick }: HeatC
               key={day}
               type="button"
               className={cx('cal__cell', date === today && 'is-today')}
+              style={{ '--d': i } as CSSProperties}
               data-l={future ? 'f' : levels[i]}
               disabled={future}
               aria-label={`${day} de ${name}: ${total > 0 ? fmt.formatRounded(total) : 'sin gastos'}`}

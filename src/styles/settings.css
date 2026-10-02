@@ -1,5 +1,5 @@
 .settings {
-  padding-bottom: 40px;
+  padding-bottom: calc(var(--nav-total) + 30px);
 }
 
 .section {
@@ -11,11 +11,11 @@
 }
 
 .section__title {
-  margin: 0 4px 8px;
-  color: var(--muted);
+  margin: 0 4px 10px;
+  color: var(--ink-2);
   font-size: 12.5px;
   font-weight: 800;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 
@@ -105,4 +105,34 @@
   font-weight: 600;
   line-height: 1.5;
   text-align: center;
+}
+
+/* the "typical month" summary above the fixed incomes */
+.incomecard {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: 10px;
+  padding: 18px 20px;
+  border-radius: var(--r-l);
+  background: radial-gradient(110% 90% at 100% 0%, rgba(255, 255, 255, 0.2), transparent 60%), linear-gradient(150deg, var(--panel-in-bg), var(--panel-in-bg-2));
+  color: var(--panel-in-ink);
+  box-shadow: 0 24px 40px -28px color-mix(in srgb, var(--panel-in-bg-2) 95%, transparent), inset 0 1px 0 rgba(255, 255, 255, 0.22);
+}
+
+.incomecard .kicker,
+.incomecard__basis {
+  color: var(--panel-in-ink-2);
+}
+
+.incomecard__amount {
+  font-size: 32px;
+  font-weight: 800;
+  letter-spacing: -0.035em;
+  line-height: 1.1;
+}
+
+.incomecard__basis {
+  font-size: 13px;
+  font-weight: 600;
 }

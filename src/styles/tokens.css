@@ -5,6 +5,10 @@
  * The two dark blocks MUST declare exactly the same values: CSS can't share a
  * declaration list between a media query and an attribute selector. A unit test
  * (tokens.test.ts) fails if they drift apart.
+ *
+ * Colour roles: green is the brand and means money going out (spending); blue means money coming in.
+ * Those two are validated as a chart pair (see the dataviz notes in the README); everything else is
+ * built on the cream / forest-green neutrals.
  */
 
 @font-face {
@@ -21,12 +25,17 @@
   --font: 'Plus Jakarta Sans', system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
 
   /* surfaces */
-  --bg: #f5f1e6;
-  --bg-outer: #e9e4d4;
+  --bg: #f4f1e7;
+  --bg-outer: #e6e1d0;
   --card: #ffffff;
-  --card-2: #efeadb;
+  --card-2: #eeeadb;
+  --card-3: #e2ddc8;
   --line: rgba(8, 36, 29, 0.1);
+  --hairline: rgba(8, 36, 29, 0.06);
   --scrim: rgba(4, 31, 27, 0.5);
+  --glass: rgba(255, 255, 255, 0.88);
+  --glass-line: rgba(255, 255, 255, 0.7);
+  --ambient: rgba(25, 198, 90, 0.2);
 
   /* ink */
   --ink: #08241d;
@@ -48,11 +57,25 @@
   --warn-soft: #fbebc8;
   --bad-soft: #fde0db;
 
-  /* calculator */
+  /* money out (green) and money in (blue): chart series, validated as a pair */
+  --out: #0a8f43;
+  --in: #2a78d6;
+  --in-text: #1d62bd;
+  --in-soft: #dce8fb;
+  --in-soft-ink: #0d2f63;
+
+  /* calculator: spending */
   --panel-bg: #19c65a;
+  --panel-bg-2: #0fb08a;
   --panel-ink: #04241a;
-  --panel-ink-2: rgba(4, 36, 26, 0.7);
-  --panel-field: rgba(4, 36, 26, 0.1);
+  --panel-ink-2: #0a3326;
+  --panel-field: rgba(255, 255, 255, 0.22);
+  /* calculator: income */
+  --panel-in-bg: #2866d4;
+  --panel-in-bg-2: #1b49b0;
+  --panel-in-ink: #ffffff;
+  --panel-in-ink-2: #e8f0fd;
+  --panel-in-field: rgba(6, 18, 56, 0.22);
   --key-bg: #ffffff;
   --key-ink: #08241d;
   --key-op-bg: #06302a;
@@ -72,6 +95,8 @@
   --slide-cream-ink: #08241d;
   --slide-coral-bg: #ff6a55;
   --slide-coral-ink: #2b0a05;
+  --slide-blue-bg: #2866d4;
+  --slide-blue-ink: #ffffff;
 
   /* sequential ramp for heat cells (one hue, light -> dark) */
   --heat-0: #e7e2d2;
@@ -101,28 +126,37 @@
   --c-lime: #788a37;
   --c-slate: #6f7c8c;
 
-  --shadow-1: 0 1px 2px rgba(8, 36, 29, 0.06), 0 6px 20px rgba(8, 36, 29, 0.06);
-  --shadow-2: 0 2px 4px rgba(8, 36, 29, 0.08), 0 16px 40px rgba(8, 36, 29, 0.14);
+  --shadow-1: 0 1px 2px rgba(8, 36, 29, 0.05), 0 10px 28px -10px rgba(8, 36, 29, 0.12);
+  --shadow-2: 0 2px 4px rgba(8, 36, 29, 0.06), 0 26px 60px -14px rgba(8, 36, 29, 0.28);
+  --shadow-key: inset 0 1px 0 rgba(255, 255, 255, 0.9), inset 0 -2px 0 rgba(8, 36, 29, 0.07), 0 8px 16px -8px rgba(8, 36, 29, 0.3);
 
-  /* shape & rhythm */
-  --r-s: 12px;
-  --r-m: 18px;
-  --r-l: 24px;
-  --r-xl: 32px;
+  /* shape, rhythm and motion (same in both themes) */
+  --r-s: 14px;
+  --r-m: 20px;
+  --r-l: 26px;
+  --r-xl: 34px;
   --gutter: 18px;
-  --nav-h: 66px;
+  --nav-h: 64px;
+  --nav-gap: 12px;
+  --nav-total: calc(var(--nav-h) + var(--nav-gap) + env(safe-area-inset-bottom, 0px) + 12px);
+  --ease: cubic-bezier(0.2, 0.9, 0.3, 1);
+  --spring: cubic-bezier(0.3, 1.45, 0.5, 1);
 }
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme='light']) {
     color-scheme: dark;
-
     --bg: #041f1b;
     --bg-outer: #021512;
-    --card: #082f29;
-    --card-2: #0d3d35;
+    --card: #08302a;
+    --card-2: #0d3f37;
+    --card-3: #134c42;
     --line: rgba(245, 241, 230, 0.1);
-    --scrim: rgba(0, 0, 0, 0.6);
+    --hairline: rgba(245, 241, 230, 0.06);
+    --scrim: rgba(0, 0, 0, 0.62);
+    --glass: rgba(9, 44, 38, 0.88);
+    --glass-line: rgba(245, 241, 230, 0.1);
+    --ambient: rgba(25, 198, 90, 0.16);
 
     --ink: #f5f1e6;
     --ink-2: #bccfc8;
@@ -131,21 +165,33 @@
     --accent: #19c65a;
     --accent-ink: #04241a;
     --accent-2: #c5f135;
-    --accent-soft: #0d3d35;
+    --accent-soft: #0d3f37;
 
     --mark: #19c65a;
     --good: #19c65a;
     --warn: #ffb52e;
     --bad: #ff7a66;
-    --good-soft: #0d3d35;
+    --good-soft: #0d3f37;
     --warn-soft: #3a3010;
     --bad-soft: #43201b;
 
-    --panel-bg: #0b433a;
+    --out: #0ca30c;
+    --in: #3987e5;
+    --in-text: #7db3f8;
+    --in-soft: #12335f;
+    --in-soft-ink: #cfe0fb;
+
+    --panel-bg: #0f6a52;
+    --panel-bg-2: #0a463c;
     --panel-ink: #f5f1e6;
-    --panel-ink-2: rgba(245, 241, 230, 0.72);
-    --panel-field: rgba(245, 241, 230, 0.1);
-    --key-bg: #0d3d35;
+    --panel-ink-2: #dedacd;
+    --panel-field: rgba(0, 18, 14, 0.3);
+    --panel-in-bg: #2459b8;
+    --panel-in-bg-2: #153877;
+    --panel-in-ink: #ffffff;
+    --panel-in-ink-2: #e8f0fd;
+    --panel-in-field: rgba(2, 10, 40, 0.3);
+    --key-bg: #0d3f37;
     --key-ink: #f5f1e6;
     --key-op-bg: #14574a;
     --key-op-ink: #c5f135;
@@ -163,8 +209,10 @@
     --slide-cream-ink: #08241d;
     --slide-coral-bg: #ff7a66;
     --slide-coral-ink: #2b0a05;
+    --slide-blue-bg: #2459b8;
+    --slide-blue-ink: #ffffff;
 
-    --heat-0: #0d3d35;
+    --heat-0: #0d3f37;
     --heat-1: #14574a;
     --heat-2: #1b7a5b;
     --heat-3: #19a55a;
@@ -190,8 +238,9 @@
     --c-lime: #8ca507;
     --c-slate: #7a8798;
 
-    --shadow-1: 0 0 0 1px rgba(245, 241, 230, 0.06);
-    --shadow-2: 0 0 0 1px rgba(245, 241, 230, 0.08), 0 16px 40px rgba(0, 0, 0, 0.5);
+    --shadow-1: 0 0 0 1px rgba(245, 241, 230, 0.06), 0 10px 28px -12px rgba(0, 0, 0, 0.55);
+    --shadow-2: 0 0 0 1px rgba(245, 241, 230, 0.08), 0 26px 60px -14px rgba(0, 0, 0, 0.7);
+    --shadow-key: inset 0 1px 0 rgba(245, 241, 230, 0.12), inset 0 -2px 0 rgba(0, 0, 0, 0.25), 0 8px 16px -8px rgba(0, 0, 0, 0.6);
   }
 }
 
@@ -200,10 +249,15 @@
 
   --bg: #041f1b;
   --bg-outer: #021512;
-  --card: #082f29;
-  --card-2: #0d3d35;
+  --card: #08302a;
+  --card-2: #0d3f37;
+  --card-3: #134c42;
   --line: rgba(245, 241, 230, 0.1);
-  --scrim: rgba(0, 0, 0, 0.6);
+  --hairline: rgba(245, 241, 230, 0.06);
+  --scrim: rgba(0, 0, 0, 0.62);
+  --glass: rgba(9, 44, 38, 0.88);
+  --glass-line: rgba(245, 241, 230, 0.1);
+  --ambient: rgba(25, 198, 90, 0.16);
 
   --ink: #f5f1e6;
   --ink-2: #bccfc8;
@@ -212,21 +266,33 @@
   --accent: #19c65a;
   --accent-ink: #04241a;
   --accent-2: #c5f135;
-  --accent-soft: #0d3d35;
+  --accent-soft: #0d3f37;
 
   --mark: #19c65a;
   --good: #19c65a;
   --warn: #ffb52e;
   --bad: #ff7a66;
-  --good-soft: #0d3d35;
+  --good-soft: #0d3f37;
   --warn-soft: #3a3010;
   --bad-soft: #43201b;
 
-  --panel-bg: #0b433a;
+  --out: #0ca30c;
+  --in: #3987e5;
+  --in-text: #7db3f8;
+  --in-soft: #12335f;
+  --in-soft-ink: #cfe0fb;
+
+  --panel-bg: #0f6a52;
+  --panel-bg-2: #0a463c;
   --panel-ink: #f5f1e6;
-  --panel-ink-2: rgba(245, 241, 230, 0.72);
-  --panel-field: rgba(245, 241, 230, 0.1);
-  --key-bg: #0d3d35;
+  --panel-ink-2: #dedacd;
+  --panel-field: rgba(0, 18, 14, 0.3);
+  --panel-in-bg: #2459b8;
+  --panel-in-bg-2: #153877;
+  --panel-in-ink: #ffffff;
+  --panel-in-ink-2: #e8f0fd;
+  --panel-in-field: rgba(2, 10, 40, 0.3);
+  --key-bg: #0d3f37;
   --key-ink: #f5f1e6;
   --key-op-bg: #14574a;
   --key-op-ink: #c5f135;
@@ -244,8 +310,10 @@
   --slide-cream-ink: #08241d;
   --slide-coral-bg: #ff7a66;
   --slide-coral-ink: #2b0a05;
+  --slide-blue-bg: #2459b8;
+  --slide-blue-ink: #ffffff;
 
-  --heat-0: #0d3d35;
+  --heat-0: #0d3f37;
   --heat-1: #14574a;
   --heat-2: #1b7a5b;
   --heat-3: #19a55a;
@@ -271,6 +339,7 @@
   --c-lime: #8ca507;
   --c-slate: #7a8798;
 
-  --shadow-1: 0 0 0 1px rgba(245, 241, 230, 0.06);
-  --shadow-2: 0 0 0 1px rgba(245, 241, 230, 0.08), 0 16px 40px rgba(0, 0, 0, 0.5);
+  --shadow-1: 0 0 0 1px rgba(245, 241, 230, 0.06), 0 10px 28px -12px rgba(0, 0, 0, 0.55);
+  --shadow-2: 0 0 0 1px rgba(245, 241, 230, 0.08), 0 26px 60px -14px rgba(0, 0, 0, 0.7);
+  --shadow-key: inset 0 1px 0 rgba(245, 241, 230, 0.12), inset 0 -2px 0 rgba(0, 0, 0, 0.25), 0 8px 16px -8px rgba(0, 0, 0, 0.6);
 }

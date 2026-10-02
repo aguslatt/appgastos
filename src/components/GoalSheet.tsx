@@ -10,16 +10,10 @@ import { useCapacity } from '../state/goals';
 import { store, useData } from '../state/store';
 import { useUi } from '../state/ui';
 import { AmountField, parseOptionalAmount } from './AmountField';
+import { Burst } from './Burst';
+import { Ring } from './charts/Ring';
 import { GoalChip } from './GoalChip';
 import { Sheet } from './Sheet';
-
-export function ProgressBar({ value, label }: { value: number; label: string }) {
-  return (
-    <div className="pbar" role="progressbar" aria-label={label} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(value * 100)}>
-      <i style={{ width: `${Math.max(value > 0 ? 3 : 0, value * 100)}%` }} />
-    </div>
-  );
-}
 
 /** One goal in detail: progress, whether it's on track, how to get there, and what it's made of. */
 export function GoalSheet({ id, onClose, onEdit }: { id: string; onClose: () => void; onEdit: (id: string) => void }) {
@@ -31,6 +25,7 @@ export function GoalSheet({ id, onClose, onEdit }: { id: string; onClose: () => 
   const capacity = useCapacity();
   const catMap = useCategoryMap();
   const [amountText, setAmountText] = useState('');
+  const [celebrate, setCelebrate] = useState(0);
   if (!goal) return null;
 
   const locale = settings.locale;
@@ -50,6 +45,8 @@ export function GoalSheet({ id, onClose, onEdit }: { id: string; onClose: () => 
   const add = (sign: 1 | -1) => {
     if (amount.value === null) return;
     store.addToGoal(id, sign * amount.value);
+    // The sum that completes the goal gets a little celebration.
+    if (sign === 1 && goal.saved < goal.target && goal.saved + amount.value >= goal.target) setCelebrate((n) => n + 1);
     ui.haptic('ok');
     ui.toast({ text: sign === 1 ? `Sumaste ${fmt.formatRounded(amount.value)} a la meta` : `Retiraste ${fmt.formatRounded(amount.value)}` });
     setAmountText('');
@@ -66,18 +63,22 @@ export function GoalSheet({ id, onClose, onEdit }: { id: string; onClose: () => 
   return (
     <Sheet title={`${goal.emoji} ${goal.name}`} onClose={onClose}>
       <div className="stack">
-        <section className="card">
-          <div className="goal__amounts">
-            <span>
-              <b className="tnum">{fmt.formatRounded(goal.saved)}</b> <span className="muted">de {fmt.formatRounded(goal.target)}</span>
-            </span>
-            <b>{Math.round(progress(goal) * 100)}%</b>
+        <section className="card goal__hero">
+          <span className="goal__ring" role="progressbar" aria-label="Avance de la meta" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(progress(goal) * 100)}>
+            {celebrate > 0 && <Burst key={celebrate} />}
+            <Ring value={progress(goal)} size={104} stroke={11} tone={message.tone === 'off' ? 'bad' : message.tone === 'tight' || message.tone === 'late' ? 'warn' : 'accent'}>
+              <span className="goal__pct">{Math.round(progress(goal) * 100)}%</span>
+            </Ring>
+          </span>
+          <div className="goal__hero-text">
+            <span className="muted">Llevas</span>
+            <b className="goal__saved tnum">{fmt.formatRounded(goal.saved)}</b>
+            <span className="muted">de {fmt.formatRounded(goal.target)}</span>
+            <p className="goal__when muted">
+              Para {formatMonthLabel(goal.deadline, locale)}
+              {left > 0 ? ` · faltan ${left} ${left === 1 ? 'mes' : 'meses'}` : ''}
+            </p>
           </div>
-          <ProgressBar value={progress(goal)} label="Avance de la meta" />
-          <p className="goal__when muted">
-            Para {formatMonthLabel(goal.deadline, locale)}
-            {left > 0 ? ` · faltan ${left} ${left === 1 ? 'mes' : 'meses'}` : ''}
-          </p>
         </section>
 
         <section className="card goal__verdict" data-tone={message.tone}>

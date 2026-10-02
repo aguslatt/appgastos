@@ -21,7 +21,7 @@ export interface LiveInput {
   locale: string;
 }
 
-export type LiveTone = 'neutral' | 'warn' | 'over';
+export type LiveTone = 'neutral' | 'good' | 'warn' | 'over';
 
 export interface LiveContext {
   text: string;
@@ -89,4 +89,42 @@ export function describeLive(i: LiveInput): LiveContext | null {
   const shown = parts.slice(0, 2);
   const tone: LiveTone = shown.some((p) => p.tone === 'over') ? 'over' : shown.some((p) => p.tone === 'warn') ? 'warn' : 'neutral';
   return { text: shown.map((p) => p.text).join(' · '), tone };
+}
+
+export interface IncomeLiveInput {
+  /** What is being entered right now (cents, > 0). */
+  amount: Cents;
+  date: DateStr;
+  today: DateStr;
+  /** What had already come in during the month of `date`. */
+  monthIncome: Cents;
+  /** What was spent during that month. */
+  monthSpent: Cents;
+  fmt: MoneyFormatter;
+  locale: string;
+}
+
+/** One short line shown while typing an income: what the month looks like with it. */
+export function describeIncomeLive(i: IncomeLiveInput): LiveContext | null {
+  const { amount, fmt } = i;
+  if (amount <= 0) return null;
+
+  const month = monthKeyOf(i.date);
+  const after = i.monthIncome + amount;
+  const parts: LiveContext[] = [];
+
+  if (month !== monthKeyOf(i.today)) parts.push({ text: `Se suma a ${monthName(month, i.locale)}`, tone: 'neutral' });
+  else parts.push({ text: i.monthIncome > 0 ? `Este mes ya suman ${fmt.formatRounded(after)}` : 'Es lo primero que entra este mes', tone: 'neutral' });
+
+  if (i.monthSpent > 0) {
+    const balance = after - i.monthSpent;
+    parts.push(
+      balance >= 0
+        ? { text: `te quedan ${fmt.formatRounded(balance)}`, tone: 'good' }
+        : { text: `faltan ${fmt.formatRounded(-balance)} para cubrir el mes`, tone: 'warn' },
+    );
+  }
+
+  const tone: LiveTone = parts.some((p) => p.tone === 'warn') ? 'warn' : parts.some((p) => p.tone === 'good') ? 'good' : 'neutral';
+  return { text: parts.map((p) => p.text).join(' · '), tone };
 }

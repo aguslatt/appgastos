@@ -26,6 +26,11 @@
   color: var(--accent-ink);
 }
 
+.kind-card__icon--in {
+  background: linear-gradient(150deg, var(--panel-in-bg), var(--panel-in-bg-2));
+  color: var(--panel-in-ink);
+}
+
 .kind-card__text {
   display: flex;
   flex-direction: column;
@@ -204,7 +209,7 @@
 /* ---- goals screen and sheet ------------------------------------------------------------------ */
 
 .goals {
-  padding-bottom: 36px;
+  padding-bottom: calc(var(--nav-total) + 24px);
 }
 
 .goals__empty {
@@ -286,15 +291,61 @@
 .goal__top {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 16px;
+}
+
+.goal__emoji {
+  font-size: 28px;
+  line-height: 1;
+}
+
+.goal__hero {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.goal__ring {
+  position: relative;
+  display: inline-grid;
+  flex: none;
+}
+
+.goal__hero-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.goal__saved {
+  font-size: 28px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1.15;
+}
+
+.goal__pct {
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
 }
 
 .goal__name {
   display: flex;
   flex: 1;
   flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
   min-width: 0;
   font-size: 13px;
+}
+
+.goal__name .chip {
+  margin-top: 6px;
+  min-height: 30px;
+  font-size: 12.5px;
 }
 
 .goal__name b {
@@ -310,30 +361,9 @@
   align-items: baseline;
   justify-content: space-between;
   gap: 12px;
+  padding-top: 12px;
+  box-shadow: inset 0 1px 0 var(--hairline);
   font-size: 14px;
-}
-
-.pbar {
-  height: 12px;
-  border-radius: 6px;
-  background: color-mix(in srgb, var(--mark) 18%, var(--card));
-  overflow: hidden;
-}
-
-.pbar i {
-  display: block;
-  height: 100%;
-  border-radius: 6px;
-  background: var(--mark);
-  transition: width 0.6s cubic-bezier(0.2, 0.9, 0.3, 1);
-}
-
-.goal__amounts {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  margin-bottom: 10px;
-  font-size: 18px;
 }
 
 .goal__when {

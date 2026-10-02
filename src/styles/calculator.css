@@ -1,8 +1,22 @@
 .calc {
+  --p-bg: var(--panel-bg);
+  --p-bg-2: var(--panel-bg-2);
+  --p-ink: var(--panel-ink);
+  --p-ink-2: var(--panel-ink-2);
+  --p-field: var(--panel-field);
   display: flex;
   flex-direction: column;
   height: 100%;
   min-height: 0;
+}
+
+/* Money coming in repaints the panel blue, so there is never doubt about which mode you are in. */
+.calc[data-kind='income'] {
+  --p-bg: var(--panel-in-bg);
+  --p-bg-2: var(--panel-in-bg-2);
+  --p-ink: var(--panel-in-ink);
+  --p-ink-2: var(--panel-in-ink-2);
+  --p-field: var(--panel-in-field);
 }
 
 /* ---- display panel -------------------------------------------------------------- */
@@ -13,27 +27,45 @@
   flex: 1 1 auto;
   flex-direction: column;
   min-height: 214px;
-  padding: 14px var(--gutter) 16px;
+  padding: calc(14px + env(safe-area-inset-top, 0px)) var(--gutter) 16px;
   border-radius: 0 0 var(--r-xl) var(--r-xl);
-  background: var(--panel-bg);
-  color: var(--panel-ink);
+  background: radial-gradient(120% 80% at 100% 0%, rgba(255, 255, 255, 0.2), transparent 58%), linear-gradient(155deg, var(--panel-bg), var(--panel-bg-2));
+  color: var(--p-ink);
+  box-shadow: 0 26px 40px -26px color-mix(in srgb, var(--panel-bg-2) 80%, transparent);
   overflow: hidden;
+  isolation: isolate;
+  transition: color 0.4s ease;
 }
 
-.calc__panel::before {
+/* The income colors fade in over the spending ones. */
+.calc__panel::after {
   content: '';
   position: absolute;
-  top: -70px;
-  right: -60px;
-  width: 210px;
-  height: 210px;
-  border-radius: 50%;
-  background: color-mix(in srgb, var(--panel-ink) 7%, transparent);
+  inset: 0;
+  z-index: -2;
+  background: radial-gradient(120% 80% at 100% 0%, rgba(255, 255, 255, 0.2), transparent 58%), linear-gradient(155deg, var(--panel-in-bg), var(--panel-in-bg-2));
+  opacity: 0;
+  transition: opacity 0.5s ease;
   pointer-events: none;
 }
 
-.calc__panel > * {
-  position: relative;
+.calc[data-kind='income'] .calc__panel::after {
+  opacity: 1;
+}
+
+/* A slow, soft light that drifts across the top corner. */
+.calc__panel::before {
+  content: '';
+  position: absolute;
+  top: -120px;
+  right: -90px;
+  z-index: -1;
+  width: 290px;
+  height: 290px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, color-mix(in srgb, var(--p-ink) 14%, transparent), transparent 68%);
+  animation: drift 14s ease-in-out infinite;
+  pointer-events: none;
 }
 
 .calc__top {
@@ -43,39 +75,92 @@
   gap: 8px;
 }
 
+.kindswitch {
+  position: relative;
+  display: inline-grid;
+  flex: none;
+  grid-template-columns: 1fr 1fr;
+  padding: 3px;
+  border-radius: 999px;
+  background: var(--p-field);
+  isolation: isolate;
+}
+
+.kindswitch::before {
+  content: '';
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  left: 3px;
+  z-index: -1;
+  width: calc(50% - 3px);
+  border-radius: 999px;
+  background: var(--p-ink);
+  box-shadow: 0 6px 14px -6px rgba(0, 0, 0, 0.45);
+  transform: translateX(calc(var(--i, 0) * 100%));
+  transition: transform 0.4s var(--spring), background-color 0.4s ease;
+}
+
+.kindswitch button {
+  min-height: 38px;
+  padding: 0 16px;
+  border-radius: 999px;
+  color: var(--p-ink);
+  font-size: 14px;
+  font-weight: 800;
+  transition: color 0.3s ease;
+}
+
+.kindswitch button[aria-pressed='true'] {
+  color: var(--p-bg);
+}
+
 .calc__promo {
   display: inline-flex;
   flex: none;
+  align-self: flex-start;
   align-items: center;
   gap: 6px;
-  min-height: 40px;
+  min-height: 36px;
+  margin-top: 8px;
   padding: 0 14px;
   border-radius: 999px;
   background: var(--accent-2);
   color: var(--accent-ink);
+  box-shadow: 0 8px 16px -8px rgba(4, 36, 26, 0.5);
   font-size: 14px;
   font-weight: 800;
-  animation: pop 0.3s cubic-bezier(0.3, 1.6, 0.5, 1);
+  animation: pop 0.34s var(--spring);
 }
 
 .calc__month {
   display: inline-flex;
+  min-width: 0;
   align-items: center;
   gap: 8px;
   min-height: 40px;
   padding: 0 12px 0 16px;
   border-radius: 999px;
-  background: var(--panel-field);
-  color: var(--panel-ink);
+  background: var(--p-field);
+  color: var(--p-ink);
   font-size: 14px;
   font-weight: 700;
+  transition: transform 0.14s var(--ease);
+}
+
+.calc__month:active {
+  transform: scale(0.96);
 }
 
 .calc__month strong {
+  overflow: hidden;
   font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .calc__display {
+  position: relative;
   display: flex;
   flex: 1;
   flex-direction: column;
@@ -91,7 +176,7 @@
   max-width: 100%;
   min-height: 24px;
   overflow: hidden;
-  color: var(--panel-ink-2);
+  color: var(--p-ink-2);
   font-size: 19px;
   font-weight: 700;
   text-overflow: ellipsis;
@@ -107,19 +192,38 @@
 }
 
 .calc__cur {
-  color: var(--panel-ink-2);
+  color: var(--p-ink-2);
   font-size: 30px;
   font-weight: 700;
 }
 
 .calc__num {
+  display: inline-block;
   /* fits the width of the display and never takes more than ~10% of the screen height */
-  font-size: clamp(34px, min(calc((100cqw - 40px) / (var(--n, 5) * 0.56)), 9.5vh), 80px);
-  font-size: clamp(34px, min(calc((100cqw - 40px) / (var(--n, 5) * 0.56)), 9.5dvh), 80px);
+  font-size: clamp(20px, min(calc((100cqw - 40px) / (var(--n, 5) * 0.56)), 9.5vh), 80px);
+  font-size: clamp(20px, min(calc((100cqw - 40px) / (var(--n, 5) * 0.56)), 9.5dvh), 80px);
   font-weight: 800;
-  letter-spacing: -0.035em;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.04em;
   line-height: 1.02;
   white-space: nowrap;
+  transform-origin: 100% 60%;
+}
+
+.calc__num.is-bump {
+  animation: bump 0.2s var(--ease);
+}
+
+@keyframes bump {
+  from {
+    transform: scale(0.94);
+  }
+  60% {
+    transform: scale(1.025);
+  }
+  to {
+    transform: scale(1);
+  }
 }
 
 .calc__amount.is-shaking {
@@ -141,6 +245,78 @@
   }
 }
 
+/* what was just saved floats up and away */
+.calc__fly {
+  position: absolute;
+  top: 50%;
+  right: 4px;
+  padding: 7px 16px;
+  border-radius: 999px;
+  background: var(--p-ink);
+  color: var(--p-bg);
+  box-shadow: 0 12px 24px -10px rgba(0, 0, 0, 0.5);
+  font-size: 20px;
+  font-weight: 800;
+  white-space: nowrap;
+  pointer-events: none;
+  animation: fly 1.05s var(--ease) both;
+}
+
+@keyframes fly {
+  0% {
+    opacity: 0;
+    transform: translateY(26px) scale(0.8);
+  }
+  22% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-96px) scale(1.04);
+  }
+}
+
+.burst {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+
+.burst i {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: var(--s);
+  height: var(--s);
+  margin: calc(var(--s) / -2);
+  border-radius: 50%;
+  background: var(--accent-2);
+  animation: spark 0.85s var(--ease) both;
+}
+
+.burst i:nth-child(3n) {
+  background: var(--accent);
+}
+
+.burst i:nth-child(4n) {
+  background: var(--c-orange);
+}
+
+@keyframes spark {
+  from {
+    opacity: 1;
+    transform: rotate(var(--a)) translateX(0) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: rotate(var(--a)) translateX(var(--d)) scale(0.2);
+  }
+}
+
 .calc__concept {
   display: flex;
   align-items: center;
@@ -151,23 +327,25 @@
 .calc__input {
   flex: 1;
   min-width: 0;
-  min-height: 50px;
-  padding: 0 18px;
+  min-height: 52px;
+  padding: 0 20px;
   border: 0;
   border-radius: 999px;
-  background: var(--panel-field);
-  color: var(--panel-ink);
+  background: var(--p-field);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--p-ink) 10%, transparent);
+  color: var(--p-ink);
   font-weight: 700;
+  transition: box-shadow 0.15s ease;
 }
 
 .calc__input::placeholder {
-  color: var(--panel-ink-2);
+  color: var(--p-ink-2);
   font-weight: 600;
 }
 
 .calc__input:focus-visible {
   outline: none;
-  box-shadow: inset 0 0 0 2.5px var(--panel-ink);
+  box-shadow: inset 0 0 0 2.5px var(--p-ink);
 }
 
 .calc__mic {
@@ -175,11 +353,17 @@
   display: grid;
   flex: none;
   place-items: center;
-  width: 50px;
-  height: 50px;
+  width: 52px;
+  height: 52px;
   border-radius: 50%;
-  background: var(--panel-ink);
-  color: var(--panel-bg);
+  background: var(--p-ink);
+  color: var(--p-bg);
+  box-shadow: 0 10px 18px -10px rgba(0, 0, 0, 0.55);
+  transition: transform 0.14s var(--ease);
+}
+
+.calc__mic:active {
+  transform: scale(0.92);
 }
 
 .calc__mic.is-on {
@@ -200,13 +384,14 @@
 .calc__live {
   min-height: 20px;
   margin-top: 10px;
-  color: var(--panel-ink-2);
+  color: var(--p-ink-2);
   font-size: 14px;
   font-weight: 700;
 }
 
-.calc__live[data-tone='warn'] {
-  color: var(--panel-ink);
+.calc__live[data-tone='warn'],
+.calc__live[data-tone='good'] {
+  color: var(--p-ink);
 }
 
 .calc__live[data-tone='over'] {
@@ -219,7 +404,8 @@
   color: #1c0502;
 }
 
-.calc__live[data-tone='warn']::before {
+.calc__live[data-tone='warn']::before,
+.calc__live[data-tone='good']::before {
   content: '';
   display: inline-block;
   width: 8px;
@@ -227,7 +413,7 @@
   margin-right: 8px;
   border-radius: 50%;
   background: var(--accent-2);
-  box-shadow: 0 0 0 2px var(--panel-ink);
+  box-shadow: 0 0 0 2px var(--p-ink);
 }
 
 /* ---- folder pills -------------------------------------------------------------- */
@@ -267,6 +453,7 @@
 
 .pill--date {
   --pill-color: var(--muted);
+  padding-left: 14px;
   background: var(--card);
 }
 
@@ -283,7 +470,7 @@
   flex: none;
   grid-template-columns: repeat(4, 1fr);
   gap: 10px;
-  padding: 8px var(--gutter) 14px;
+  padding: 8px var(--gutter) calc(var(--nav-total) - 8px);
 }
 
 .key {
@@ -291,26 +478,27 @@
   align-items: center;
   justify-content: center;
   gap: 10px;
-  height: clamp(50px, 7.4vh, 66px);
-  height: clamp(50px, 7.4dvh, 66px);
+  height: clamp(50px, 7.2vh, 64px);
+  height: clamp(50px, 7.2dvh, 64px);
   border-radius: 22px;
   background: var(--key-bg);
   color: var(--key-ink);
-  box-shadow: var(--shadow-1);
+  box-shadow: var(--shadow-key);
   font-size: 27px;
   font-weight: 700;
-  transition: transform 0.08s ease, filter 0.08s ease;
+  transition: transform 0.1s var(--ease), box-shadow 0.1s ease, filter 0.1s ease;
   user-select: none;
   -webkit-user-select: none;
 }
 
 .key:active {
-  transform: scale(0.93);
-  filter: brightness(0.94);
+  transform: translateY(1px) scale(0.95);
+  filter: brightness(0.95);
+  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.14);
 }
 
 .key--op {
-  background: var(--key-op-bg);
+  background: linear-gradient(170deg, color-mix(in srgb, var(--key-op-bg) 82%, #fff), var(--key-op-bg));
   color: var(--key-op-ink);
   font-size: 30px;
 }
@@ -323,14 +511,16 @@
 
 .key--go {
   grid-column: span 2;
-  background: var(--key-go-bg);
+  background: linear-gradient(170deg, color-mix(in srgb, var(--key-go-bg) 70%, #fff), var(--key-go-bg));
   color: var(--key-go-ink);
+  box-shadow: 0 16px 26px -14px color-mix(in srgb, var(--key-go-bg) 90%, #3a5200), inset 0 1px 0 rgba(255, 255, 255, 0.7);
   font-size: 18px;
   font-weight: 800;
 }
 
 .key--go[aria-disabled='true'] {
   opacity: 0.5;
+  box-shadow: none;
 }
 
 .key__go-text {
@@ -375,6 +565,19 @@
   display: none;
 }
 
+.calc--edit .calc__pad {
+  padding-bottom: 14px;
+}
+
+.calc--edit .key--go {
+  gap: 8px;
+  font-size: 16px;
+}
+
+.key__go-text > span:first-child {
+  white-space: nowrap;
+}
+
 .calc--edit {
   overflow-y: auto;
 }
@@ -387,11 +590,12 @@
 @media (max-height: 760px) {
   .calc__panel {
     min-height: 0;
-    padding: 10px var(--gutter) 12px;
+    padding: calc(10px + env(safe-area-inset-top, 0px)) var(--gutter) 12px;
   }
 
   .calc__month,
-  .calc__promo {
+  .calc__promo,
+  .kindswitch button {
     min-height: 34px;
   }
 
@@ -434,12 +638,16 @@
 
   .calc__pad {
     gap: 8px;
-    padding: 6px var(--gutter) 10px;
+    padding: 6px var(--gutter) calc(var(--nav-total) - 10px);
+  }
+
+  .calc--edit .calc__pad {
+    padding-bottom: 10px;
   }
 
   .key {
-    height: clamp(42px, 6.3vh, 56px);
-    height: clamp(42px, 6.3dvh, 56px);
+    height: clamp(42px, 6.1vh, 54px);
+    height: clamp(42px, 6.1dvh, 54px);
     border-radius: 18px;
     font-size: 24px;
   }
@@ -451,8 +659,19 @@
   .key--go {
     font-size: 17px;
   }
+}
 
-  .tab {
-    min-height: 48px;
+/* The narrowest phones: give the month chip and the switch every pixel they can have. */
+@media (max-width: 340px) {
+  .calc__month {
+    padding: 0 12px;
+  }
+
+  .calc__month svg {
+    display: none;
+  }
+
+  .kindswitch button {
+    padding: 0 12px;
   }
 }

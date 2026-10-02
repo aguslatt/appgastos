@@ -1,13 +1,14 @@
 import { Plus, Target } from 'lucide-react';
 import { useState } from 'react';
 import { GoalChip } from '../components/GoalChip';
-import { GoalSheet, ProgressBar } from '../components/GoalSheet';
+import { Ring } from '../components/charts/Ring';
+import { GoalSheet } from '../components/GoalSheet';
 import { GoalWizard } from '../components/GoalWizard';
-import { IncomeSheet } from '../components/IncomeSheet';
+import { IncomeSetupSheet } from '../components/IncomeSetupSheet';
 import { formatMonthLabel } from '../lib/dates';
 import { describeGoal } from '../lib/goalText';
 import { goalStatus, monthsLeft, progress, requiredPerMonth, totalRequired } from '../lib/goals';
-import { useFmt, useToday } from '../state/derived';
+import { useExpectedIncome, useFmt, useToday } from '../state/derived';
 import { useCapacity } from '../state/goals';
 import { useData } from '../state/store';
 
@@ -16,6 +17,7 @@ export function GoalsScreen() {
   const today = useToday();
   const fmt = useFmt();
   const capacity = useCapacity();
+  const expected = useExpectedIncome();
   const locale = settings.locale;
   const [wizard, setWizard] = useState<string | null>(null);
   const [detail, setDetail] = useState<string | null>(null);
@@ -53,13 +55,13 @@ export function GoalsScreen() {
         </section>
       ) : (
         <div className="stack">
-          {settings.monthlyIncome === null && (
+          {expected.amount === null && (
             <section className="tile tile--cta">
               <div>
                 <p className="card__title" style={{ marginBottom: 4 }}>
-                  ¿Cuánto cobras al mes?
+                  ¿Cuánto te entra por mes?
                 </p>
-                <p className="muted">Con tu ingreso te digo si cada meta entra o hay que recortar.</p>
+                <p className="muted">Con tus ingresos te digo si cada meta entra o hay que recortar.</p>
               </div>
               <button className="btn btn--small" onClick={() => setIncomeOpen(true)}>
                 Sumar
@@ -67,16 +69,20 @@ export function GoalsScreen() {
             </section>
           )}
 
-          {goals.map((g) => {
+          {goals.map((g, index) => {
             const committed = totalRequired(goals.filter((x) => x.id !== g.id), today);
             const status = goalStatus(g, capacity, committed, today);
             const message = describeGoal(g, status, capacity, committed, fmt, locale);
             const left = monthsLeft(g.deadline, today);
             return (
-              <button key={g.id} type="button" className="card goal" onClick={() => open(g.id)}>
+              <button key={g.id} type="button" className="card goal reveal" style={{ '--i': Math.min(index, 6) } as React.CSSProperties} onClick={() => open(g.id)}>
                 <span className="goal__top">
-                  <span className="badge" style={{ '--badge-color': 'var(--c-blue)' } as React.CSSProperties}>
-                    {g.emoji}
+                  <span role="progressbar" aria-label={`Avance de ${g.name}`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(progress(g) * 100)}>
+                    <Ring value={progress(g)} size={68} stroke={7} tone={message.tone === 'off' ? 'bad' : message.tone === 'tight' || message.tone === 'late' ? 'warn' : 'accent'}>
+                      <span className="goal__emoji" aria-hidden="true">
+                        {g.emoji}
+                      </span>
+                    </Ring>
                   </span>
                   <span className="goal__name">
                     <b>{g.name}</b>
@@ -84,10 +90,9 @@ export function GoalsScreen() {
                       {formatMonthLabel(g.deadline, locale)}
                       {left > 0 ? ` · ${left} ${left === 1 ? 'mes' : 'meses'}` : ''}
                     </span>
+                    <GoalChip tone={message.tone} label={message.label} />
                   </span>
-                  <GoalChip tone={message.tone} label={message.label} />
                 </span>
-                <ProgressBar value={progress(g)} label={`Avance de ${g.name}`} />
                 <span className="goal__foot">
                   <span>
                     <b className="tnum">{fmt.formatRounded(g.saved)}</b> <span className="muted">de {fmt.formatRounded(g.target)}</span>
@@ -120,7 +125,7 @@ export function GoalsScreen() {
           }}
         />
       )}
-      {incomeOpen && <IncomeSheet onClose={() => setIncomeOpen(false)} />}
+      {incomeOpen && <IncomeSetupSheet onClose={() => setIncomeOpen(false)} />}
     </div>
   );
 }

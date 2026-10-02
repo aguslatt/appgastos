@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { ConfirmDialog } from './components/ConfirmDialog';
 import { ExpenseSheet } from './components/ExpenseSheet';
 import { FolderSheet } from './components/FolderSheet';
+import { IncomeEntrySheet } from './components/IncomeEntrySheet';
 import { Onboarding } from './components/Onboarding';
 import { StoryOverlay } from './components/Story';
 import { TabBar } from './components/TabBar';
@@ -29,9 +30,10 @@ export default function App() {
   const today = useTodayClock();
   useViewportHeight();
 
-  // Fixed expenses that came due since the last visit.
+  // Fixed expenses and fixed incomes (a salary) that came due since the last visit.
   useEffect(() => {
     store.runRecurring(today);
+    store.runIncomeRules(today);
   }, [today]);
 
   return (
@@ -91,6 +93,7 @@ function Shell() {
       <Toasts />
       <div id="overlay-root" className="overlay-root" />
       <ExpenseSheet />
+      <IncomeEntrySheet />
       <FolderSheet />
       <StoryOverlay />
       <ConfirmDialog />

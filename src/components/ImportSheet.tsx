@@ -8,7 +8,8 @@ export function ImportSheet({ incoming, onClose }: { incoming: AppData; onClose:
   const ui = useUi();
   const merge = () => {
     const r = store.mergeIn(incoming);
-    ui.toast({ text: r.addedExpenses === 0 ? 'No había nada nuevo para agregar' : `Se agregaron ${r.addedExpenses} gastos` });
+    const added = [r.addedExpenses > 0 && `${r.addedExpenses} gastos`, r.addedIncomes > 0 && `${r.addedIncomes} ingresos`].filter(Boolean).join(' y ');
+    ui.toast({ text: added === '' ? 'No había nada nuevo para agregar' : `Se agregaron ${added}` });
     onClose();
   };
   const replace = async () => {
@@ -28,7 +29,7 @@ export function ImportSheet({ incoming, onClose }: { incoming: AppData; onClose:
     <Sheet title="Importar copia" onClose={onClose}>
       <div className="stack">
         <p>
-          La copia tiene <strong>{incoming.expenses.length}</strong> gastos, <strong>{incoming.categories.length}</strong> carpetas y <strong>{incoming.recurring.length}</strong> pagos fijos.
+          La copia tiene <strong>{incoming.expenses.length}</strong> gastos, <strong>{incoming.incomes.length}</strong> ingresos, <strong>{incoming.categories.length}</strong> carpetas y <strong>{incoming.recurring.length + incoming.incomeRules.length}</strong> movimientos fijos.
         </p>
         <button className="btn btn--block" onClick={merge}>
           Combinar con lo que ya tengo

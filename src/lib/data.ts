@@ -1,7 +1,8 @@
 import { defaultCategories, FALLBACK_CATEGORY_ID, isColorKey } from './categories';
 import { isValidDateStr, isValidMonthKey, monthKeyOf, todayStr } from './dates';
+import { resolveIncomeSource } from './incomeSources';
 import { detectLocaleAndCurrency, isSupportedCurrency } from './money';
-import type { AppData, Category, Expense, Goal, GoalKind, MovePlan, Recurring, Settings, ThemePref, TripPlan } from './types';
+import type { AppData, Category, Expense, Goal, GoalKind, Income, IncomeRule, MovePlan, Recurring, Settings, ThemePref, TripPlan } from './types';
 
 export const DATA_VERSION = 1 as const;
 export const MAX_NOTE_LENGTH = 80;
@@ -14,6 +15,8 @@ export function createInitialData(language?: string): AppData {
     expenses: [],
     categories: defaultCategories(),
     recurring: [],
+    incomes: [],
+    incomeRules: [],
     goals: [],
     settings: { currency, locale, monthlyBudget: null, monthlyIncome: null, fxRate: null, theme: 'system', haptics: true, onboarded: false },
   };
@@ -238,6 +241,56 @@ export function normalizeData(
     });
   }
 
+  // ---- incomes
+  const reservedIncomeIds = explicitIds(raw.incomes);
+  const incomeIds = new Set<string>();
+  const incomes: Income[] = [];
+  for (const item of Array.isArray(raw.incomes) ? raw.incomes : []) {
+    if (!isRecord(item)) continue;
+    const amount = positiveCents(item.amount);
+    if (amount === null || !isValidDateStr(item.date)) continue;
+    let id = text(item.id, 60);
+    if (!id || incomeIds.has(id)) id = freshId(incomeIds, reservedIncomeIds);
+    incomeIds.add(id);
+    const createdAt = typeof item.createdAt === 'number' && Number.isFinite(item.createdAt) ? item.createdAt : now;
+    const income: Income = {
+      id,
+      amount,
+      sourceId: resolveIncomeSource(item.sourceId),
+      note: text(item.note, MAX_NOTE_LENGTH),
+      date: item.date,
+      createdAt,
+      updatedAt: typeof item.updatedAt === 'number' && Number.isFinite(item.updatedAt) ? item.updatedAt : createdAt,
+    };
+    const ruleId = text(item.ruleId, 60);
+    if (ruleId) income.ruleId = ruleId;
+    if (item.demo === true) income.demo = true;
+    incomes.push(income);
+  }
+
+  // ---- fixed-income rules
+  const reservedRuleIds = explicitIds(raw.incomeRules);
+  const ruleIds = new Set<string>();
+  const incomeRules: IncomeRule[] = [];
+  for (const item of Array.isArray(raw.incomeRules) ? raw.incomeRules : []) {
+    if (!isRecord(item)) continue;
+    const amount = positiveCents(item.amount);
+    if (amount === null) continue;
+    let id = text(item.id, 60);
+    if (!id || ruleIds.has(id)) id = freshId(ruleIds, reservedRuleIds);
+    ruleIds.add(id);
+    incomeRules.push({
+      id,
+      amount,
+      sourceId: resolveIncomeSource(item.sourceId),
+      note: text(item.note, MAX_NOTE_LENGTH),
+      day: clampDay(item.day),
+      startMonth: isValidMonthKey(item.startMonth) ? item.startMonth : monthKeyOf(today),
+      lastGenerated: isValidMonthKey(item.lastGenerated) ? item.lastGenerated : null,
+      active: item.active !== false,
+    });
+  }
+
   // ---- goals
   const reservedGoalIds = explicitIds(raw.goals);
   const goalIds = new Set<string>();
@@ -278,10 +331,10 @@ export function normalizeData(
     theme: THEMES.includes(s.theme as ThemePref) ? (s.theme as ThemePref) : 'system',
     haptics: s.haptics !== false,
     // Anyone with data has obviously been through onboarding already.
-    onboarded: s.onboarded === true || expenses.length > 0,
+    onboarded: s.onboarded === true || expenses.length > 0 || incomes.length > 0,
   };
 
-  return { version: DATA_VERSION, expenses, categories, recurring, goals, settings };
+  return { version: DATA_VERSION, expenses, categories, recurring, incomes, incomeRules, goals, settings };
 }
 
 export function makeIdGenerator(): () => string {

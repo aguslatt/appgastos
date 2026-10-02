@@ -1,30 +1,44 @@
-import { AlertTriangle, CheckCircle2, Play, TrendingDown, TrendingUp, XCircle } from 'lucide-react';
+import { AlertTriangle, ArrowUpRight, CheckCircle2, Play, Plus, TrendingDown, TrendingUp, XCircle } from 'lucide-react';
 import { useMemo, useState, type CSSProperties } from 'react';
 import { BudgetSheet } from '../components/BudgetSheet';
 import { DaySheet } from '../components/DaySheet';
 import { FolderBreakdown } from '../components/charts/FolderBreakdown';
+import { FlowBars } from '../components/charts/FlowBars';
 import { HeatCalendar } from '../components/charts/HeatCalendar';
 import { Meter } from '../components/charts/Meter';
+import { Ring } from '../components/charts/Ring';
+import { SpendArea } from '../components/charts/SpendArea';
+import { GoalChip } from '../components/GoalChip';
+import { IncomeSetupSheet } from '../components/IncomeSetupSheet';
 import { MonthSwitcher } from '../components/MonthSwitcher';
 import { useCountUp } from '../components/useCountUp';
+import { useMonthNav } from '../components/useMonthNav';
+import { useSwipe } from '../components/useSwipe';
 import { addMonths, monthName } from '../lib/dates';
-import { GoalChip } from '../components/GoalChip';
 import { monthSignal, totalRequired } from '../lib/goals';
+import { computeMonthIncome, flowSeries, monthBalance, upcomingFixedIncome } from '../lib/income';
+import { incomeSource } from '../lib/incomeSources';
 import { analyzeMonth, buildFacts } from '../lib/insights';
 import type { DateStr } from '../lib/types';
-import { useFmt, useToday } from '../state/derived';
+import { useExpectedIncome, useExpensesByMonth, useFmt, useIncomesByMonth, useToday } from '../state/derived';
 import { useData } from '../state/store';
 import { useUi } from '../state/ui';
 
 const pct = (v: number): string => `${Math.round(Math.abs(v) * 100)}%`;
+const stagger = (i: number): CSSProperties => ({ '--i': i }) as CSSProperties;
 
 export function MonthScreen() {
   const ui = useUi();
   const data = useData();
   const today = useToday();
   const fmt = useFmt();
+  const expected = useExpectedIncome();
+  const byMonth = useExpensesByMonth();
+  const incomesByMonth = useIncomesByMonth();
   const locale = data.settings.locale;
   const { month } = ui;
+  const nav = useMonthNav();
+  const swipe = useSwipe({ left: nav.next, right: nav.prev });
 
   const analysis = useMemo(
     () =>
@@ -41,15 +55,24 @@ export function MonthScreen() {
   const facts = useMemo(() => buildFacts({ analysis, fmt, locale }), [analysis, fmt, locale]);
   const { stats, pace, projection, budget } = analysis;
 
+  const income = useMemo(() => computeMonthIncome(incomesByMonth.get(month) ?? [], month), [incomesByMonth, month]);
+  const balance = monthBalance(income.total, stats.total);
+  const flow = useMemo(() => flowSeries(incomesByMonth, byMonth, month, 6), [incomesByMonth, byMonth, month]);
+  const showFlow = flow.some((p) => p.income > 0);
+  const upcomingIncome = stats.status === 'current' ? upcomingFixedIncome(data.incomeRules, today) : 0;
+  const neverGaveIncome = expected.amount === null && data.incomes.length === 0 && data.incomeRules.length === 0;
+
   const signal = useMemo(
-    () => (stats.status === 'current' ? monthSignal(data.settings.monthlyIncome, data.goals, projection?.total ?? null, today) : null),
-    [stats.status, data.settings.monthlyIncome, data.goals, projection, today],
+    () => (stats.status === 'current' ? monthSignal(expected.amount, data.goals, projection?.total ?? null, today) : null),
+    [stats.status, expected.amount, data.goals, projection, today],
   );
   const [dayOpen, setDayOpen] = useState<DateStr | null>(null);
   const [budgetOpen, setBudgetOpen] = useState(false);
+  const [incomeSetup, setIncomeSetup] = useState(false);
 
   const animated = useCountUp(stats.total);
   const heroText = fmt.formatNumber(Math.round(animated));
+  const animatedIncome = useCountUp(income.total);
   const current = stats.status === 'current';
   const name = monthName(month, locale);
   const prevName = monthName(addMonths(month, -1), locale);
@@ -62,15 +85,23 @@ export function MonthScreen() {
     ui.setHistoryFolder(id);
     ui.setTab('history');
   };
+  const writeIncome = () => {
+    ui.setEntryKind('income');
+    ui.setTab('calc');
+  };
+
+  const sparkSummary = `Gasto acumulado de ${name}: ${fmt.formatRounded(stats.total)}${projection && current ? `, con un cierre estimado de ${fmt.formatRounded(projection.total)}` : ''}.`;
+  const kept = balance.keptShare !== null ? Math.max(0, balance.keptShare) : 0;
+  let tile = 0;
 
   return (
-    <div className="screen--pad month">
+    <div className="screen--pad month" {...swipe}>
       <div className="screen__head">
         <MonthSwitcher />
       </div>
 
-      <div className="tiles">
-        <section className="tile tile--wide tile--hero" aria-label="Total del mes">
+      <div key={month} className="tiles" data-dir={ui.monthDir}>
+        <section className="tile tile--wide tile--hero reveal" style={stagger(tile++)} aria-label="Total del mes">
           <p className="kicker">{current ? `Gastado en ${name}` : `Total de ${name}`}</p>
           <p className="hero__amount" aria-label={`${fmt.format(stats.total)}`}>
             <span className="hero__cur">{fmt.symbol}</span>
@@ -84,6 +115,17 @@ export function MonthScreen() {
               {pace.pct > 0 ? <TrendingUp size={16} aria-hidden="true" /> : <TrendingDown size={16} aria-hidden="true" />}
               {pct(pace.pct)} {pace.pct > 0 ? 'más' : 'menos'} que {pace.toDate ? `a esta altura de ${prevName}` : prevName}
             </p>
+          )}
+
+          {!empty && (
+            <SpendArea
+              byDay={stats.byDay}
+              days={stats.daysInMonth}
+              elapsed={stats.elapsedDays}
+              projection={current ? (projection?.total ?? null) : null}
+              budget={budget?.budget ?? null}
+              summary={sparkSummary}
+            />
           )}
 
           {empty ? (
@@ -116,7 +158,7 @@ export function MonthScreen() {
         </section>
 
         {!empty && (
-          <button type="button" className="tile tile--wide tile--story" onClick={() => ui.openStory(month)}>
+          <button type="button" className="tile tile--wide tile--story reveal" style={stagger(tile++)} onClick={() => ui.openStory(month)}>
             <span className="story-cta__text">
               <span className="kicker">{current ? 'Resumen parcial' : 'Tu resumen'}</span>
               <span className="story-cta__title">{current ? `Así viene ${name}` : `Mira cómo cerró ${name}`}</span>
@@ -127,8 +169,80 @@ export function MonthScreen() {
           </button>
         )}
 
+        {income.total > 0 ? (
+          <>
+            <section className="tile tile--in reveal" style={stagger(tile++)} aria-label="Ingresos del mes">
+              <p className="kicker">{current ? 'Entró este mes' : 'Entró'}</p>
+              <p className="tile__big" style={{ '--n': fmt.formatRounded(income.total).length + 1 } as CSSProperties} aria-label={`+${fmt.format(income.total)}`}>
+                +{fmt.formatRounded(animatedIncome)}
+              </p>
+              <div className="tile__foot">
+                <div className="stackbar stackbar--on-blue" role="img" aria-label="Proporción del ingreso por tipo">
+                  {income.bySource.map((s) => (
+                    <i key={s.sourceId} style={{ flexGrow: Math.max(s.share, 0.04) }} data-n={Math.min(income.bySource.indexOf(s), 3)} />
+                  ))}
+                </div>
+                <ul className="tile__legend">
+                  {income.bySource.slice(0, 3).map((s, i) => (
+                    <li key={s.sourceId}>
+                      <i data-n={i} aria-hidden="true" />
+                      <span>{incomeSource(s.sourceId).name}</span>
+                      <b>{fmt.formatCompact(s.total)}</b>
+                    </li>
+                  ))}
+                </ul>
+                {upcomingIncome > 0 && <p className="tile__note">Falta cobrar {fmt.formatRounded(upcomingIncome)}</p>}
+              </div>
+            </section>
+
+            <section className="tile tile--balance reveal" style={stagger(tile++)} aria-label="Balance del mes" data-sign={balance.balance >= 0 ? 'plus' : 'minus'}>
+              <Ring value={kept} size={76} stroke={9} tone={balance.balance >= 0 ? 'accent' : 'bad'}>
+                {balance.keptShare !== null && balance.balance >= 0 ? pct(kept) : <TrendingDown size={22} aria-hidden="true" />}
+              </Ring>
+              <p className="tile__label">{balance.balance >= 0 ? (current ? 'Te queda' : 'Quedó') : current ? 'Vas pasado por' : 'Te pasaste por'}</p>
+              <p className="tile__value" style={{ '--n': fmt.formatRounded(Math.abs(balance.balance)).length } as CSSProperties}>
+                {balance.balance >= 0 ? '+' : '−'}
+                {fmt.formatRounded(Math.abs(balance.balance))}
+              </p>
+              <p className="tile__note">
+                {balance.balance >= 0
+                  ? `Guardas el ${pct(kept)} de lo que entra`
+                  : upcomingIncome > 0
+                    ? `Con lo que falta cobrar: ${balance.balance + upcomingIncome >= 0 ? '+' : '−'}${fmt.formatRounded(Math.abs(balance.balance + upcomingIncome))}`
+                    : 'Gastaste más de lo que entró'}
+              </p>
+            </section>
+          </>
+        ) : (
+          neverGaveIncome &&
+          current && (
+            <section className="tile tile--wide tile--cta tile--cta-in reveal" style={stagger(tile++)} aria-label="Ingresos">
+              <div>
+                <p className="card__title" style={{ marginBottom: 4 }}>
+                  ¿Cuánto te entra por mes?
+                </p>
+                <p className="muted">Anota tu sueldo o lo que cobras por tu trabajo y te muestro cuánto te queda cada mes.</p>
+              </div>
+              <button className="btn btn--blue btn--small" onClick={() => setIncomeSetup(true)}>
+                <Plus size={16} aria-hidden="true" />
+                Sumar
+              </button>
+            </section>
+          )
+        )}
+
+        {showFlow && (
+          <section className="tile tile--wide reveal" style={stagger(tile++)} aria-label="Entró contra salió">
+            <div className="card__title">
+              <span>Entró vs. salió</span>
+              <span className="muted tile__small">Últimos 6 meses</span>
+            </div>
+            <FlowBars series={flow} fmt={fmt} locale={locale} />
+          </section>
+        )}
+
         {budget ? (
-          <section className="tile tile--wide" aria-label="Presupuesto">
+          <section className="tile tile--wide reveal" style={stagger(tile++)} aria-label="Presupuesto">
             <div className="card__title">
               <span>Presupuesto</span>
               <span className="chip" data-level={budget.level}>
@@ -159,7 +273,7 @@ export function MonthScreen() {
             </div>
           </section>
         ) : (
-          <section className="tile tile--wide tile--cta" aria-label="Presupuesto">
+          <section className="tile tile--wide tile--cta reveal" style={stagger(tile++)} aria-label="Presupuesto">
             <div>
               <p className="card__title" style={{ marginBottom: 4 }}>
                 ¿Un tope para el mes?
@@ -173,7 +287,7 @@ export function MonthScreen() {
         )}
 
         {projection && current && (
-          <section className="tile" aria-label="Cierre estimado">
+          <section className="tile reveal" style={stagger(tile++)} aria-label="Cierre estimado">
             <p className="tile__label">Cierre estimado</p>
             <p className="tile__value" style={{ '--n': fmt.formatRounded(projection.total).length } as CSSProperties}>
               {fmt.formatRounded(projection.total)}
@@ -182,13 +296,21 @@ export function MonthScreen() {
           </section>
         )}
 
+        {!empty && (
+          <section className="tile reveal" style={stagger(tile++)} aria-label="Días sin gastos">
+            <p className="tile__label">Días sin gastar</p>
+            <p className="tile__value">{stats.noSpendDays}</p>
+            <p className="tile__note">{stats.longestNoSpendStreak >= 2 ? `Racha más larga: ${stats.longestNoSpendStreak} días` : 'de los días ya terminados'}</p>
+          </section>
+        )}
+
         {current && data.goals.length > 0 && signal && (
-          <button type="button" className="tile tile--wide tile--goals" onClick={() => ui.setTab('goals')}>
+          <button type="button" className="tile tile--wide tile--goals reveal" style={stagger(tile++)} onClick={() => ui.setTab('goals')}>
             <span className="card__title" style={{ marginBottom: 8 }}>
               <span>Tus metas</span>
               <GoalChip
                 tone={signal.level === 'over' ? 'off' : signal.level}
-                label={signal.level === 'ok' ? 'Vas bien' : signal.level === 'tight' ? 'Justo' : signal.level === 'over' ? 'Te pasas' : data.settings.monthlyIncome === null ? 'Falta tu ingreso' : 'Pronto para estimar'}
+                label={signal.level === 'ok' ? 'Vas bien' : signal.level === 'tight' ? 'Justo' : signal.level === 'over' ? 'Te pasas' : expected.amount === null ? 'Falta tu ingreso' : 'Pronto para estimar'}
               />
             </span>
             {signal.allowed !== null && signal.expected !== null ? (
@@ -198,22 +320,14 @@ export function MonthScreen() {
               </span>
             ) : (
               <span className="tile__note" style={{ fontSize: 14, marginTop: 0 }}>
-                {data.settings.monthlyIncome === null ? 'Suma tu ingreso mensual y te digo si tus metas entran con tu ritmo de gasto.' : 'Cuando haya unos días de gastos, te digo si tu ritmo alcanza para tus metas.'}
+                {expected.amount === null ? 'Suma tu ingreso mensual y te digo si tus metas entran con tu ritmo de gasto.' : 'Cuando haya unos días de gastos, te digo si tu ritmo alcanza para tus metas.'}
               </span>
             )}
           </button>
         )}
 
         {!empty && (
-          <section className="tile" aria-label="Días sin gastos">
-            <p className="tile__label">Días sin gastar</p>
-            <p className="tile__value">{stats.noSpendDays}</p>
-            <p className="tile__note">{stats.longestNoSpendStreak >= 2 ? `Racha más larga: ${stats.longestNoSpendStreak} días` : 'de los días ya terminados'}</p>
-          </section>
-        )}
-
-        {!empty && (
-          <section className="tile tile--wide" aria-label="Calendario del mes">
+          <section className="tile tile--wide reveal" style={stagger(tile++)} aria-label="Calendario del mes">
             <div className="card__title">
               <span>Día por día</span>
               <span className="muted tile__small">Toca un día</span>
@@ -223,7 +337,7 @@ export function MonthScreen() {
         )}
 
         {!empty && (
-          <section className="tile tile--wide" aria-label="Gasto por carpeta">
+          <section className="tile tile--wide reveal" style={stagger(tile++)} aria-label="Gasto por carpeta">
             <div className="card__title">
               <span>En qué se fue</span>
             </div>
@@ -232,7 +346,7 @@ export function MonthScreen() {
         )}
 
         {facts.length > 0 && (
-          <section className="tile tile--wide tile--facts" aria-label="Datos curiosos">
+          <section className="tile tile--wide tile--facts reveal" style={stagger(tile++)} aria-label="Datos curiosos">
             <div className="card__title">
               <span>Datos del mes</span>
             </div>
@@ -248,14 +362,23 @@ export function MonthScreen() {
         )}
       </div>
 
-      {!empty && (
-        <button className="btn btn--soft btn--block month__more" onClick={() => ui.setTab('history')}>
-          Ver todos los movimientos
-        </button>
+      {(!empty || income.total > 0) && (
+        <div className="month__more">
+          <button className="btn btn--soft btn--block" onClick={() => ui.setTab('history')}>
+            Ver todos los movimientos
+          </button>
+          {income.total > 0 || !neverGaveIncome ? (
+            <button className="btn btn--ghost btn--block month__add-income" onClick={writeIncome}>
+              <ArrowUpRight size={18} aria-hidden="true" />
+              Anotar un ingreso
+            </button>
+          ) : null}
+        </div>
       )}
 
       {dayOpen && <DaySheet date={dayOpen} onClose={() => setDayOpen(null)} />}
       {budgetOpen && <BudgetSheet onClose={() => setBudgetOpen(false)} />}
+      {incomeSetup && <IncomeSetupSheet onClose={() => setIncomeSetup(false)} />}
     </div>
   );
 }

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { BACKUP_APP_ID, backupFileName, expensesToCsv, mergeData, parseBackup, serializeBackup } from './backup';
+import { BACKUP_APP_ID, backupFileName, movementsToCsv, mergeData, parseBackup, serializeBackup } from './backup';
 import { createInitialData, normalizeData } from './data';
 import { getMoneyFormatter, parseAmountText } from './money';
 import type { AppData, Category, Expense, Goal, Recurring } from './types';
@@ -316,7 +316,7 @@ describe('serializeBackup', () => {
 
   it('has exactly the documented top-level keys', () => {
     const parsed = JSON.parse(serializeBackup(appData(), NOW)) as Record<string, unknown>;
-    expect(Object.keys(parsed).sort()).toEqual(['app', 'categories', 'expenses', 'exportedAt', 'goals', 'recurring', 'settings', 'version']);
+    expect(Object.keys(parsed).sort()).toEqual(['app', 'categories', 'expenses', 'exportedAt', 'goals', 'incomeRules', 'incomes', 'recurring', 'settings', 'version']);
   });
 
   it('is indented with two spaces so a person can read it', () => {
@@ -497,7 +497,7 @@ describe('backupFileName', () => {
   });
 });
 
-// ---- expensesToCsv ----------------------------------------------------------
+// ---- movementsToCsv ----------------------------------------------------------
 
 /** A small strict CSV reader (RFC 4180 with ";" as the separator), used to check the writer from the outside. */
 function parseCsv(text: string): string[][] {
@@ -549,15 +549,15 @@ function parseCsv(text: string): string[][] {
   return rows;
 }
 
-describe('expensesToCsv', () => {
+describe('movementsToCsv', () => {
   const ars = getMoneyFormatter('es-AR', 'ARS');
   const csvOf = (expenses: Expense[], categories?: Category[], f = ars): string =>
-    expensesToCsv(appData({ expenses, ...(categories ? { categories } : {}) }), f);
+    movementsToCsv(appData({ expenses, ...(categories ? { categories } : {}) }), f);
   const rowsOf = (expenses: Expense[], categories?: Category[], f = ars): string[][] => parseCsv(csvOf(expenses, categories, f)).slice(1);
 
   describe('shape', () => {
     it('is just the byte-order mark and the header when there is nothing to export', () => {
-      expect(csvOf([])).toBe('﻿Fecha;Carpeta;Concepto;Monto;Moneda\r\n');
+      expect(csvOf([])).toBe('﻿Fecha;Carpeta;Concepto;Monto;Moneda;Tipo\r\n');
     });
 
     it('starts with exactly one UTF-8 byte-order mark so Excel opens it as UTF-8', () => {
@@ -567,7 +567,7 @@ describe('expensesToCsv', () => {
     });
 
     it('writes the Spanish header, semicolon separated', () => {
-      expect(parseCsv(csvOf([]))[0]).toEqual(['Fecha', 'Carpeta', 'Concepto', 'Monto', 'Moneda']);
+      expect(parseCsv(csvOf([]))[0]).toEqual(['Fecha', 'Carpeta', 'Concepto', 'Monto', 'Moneda', 'Tipo']);
     });
 
     it('ends every line, including the last, with CRLF and never uses a bare line break outside quotes', () => {
@@ -579,14 +579,14 @@ describe('expensesToCsv', () => {
 
     it('writes one row per expense with the date, folder name, note, amount and currency', () => {
       const rows = rowsOf([expense({ date: '2026-10-02', categoryId: 'super', note: 'Chino', amount: 12_550 })]);
-      expect(rows).toEqual([['2026-10-02', 'Supermercado', 'Chino', '125,50', 'ARS']]);
+      expect(rows).toEqual([['2026-10-02', 'Supermercado', 'Chino', '125,50', 'ARS', 'Gasto']]);
     });
 
-    it('always has five fields per row, whatever the content', () => {
+    it('always has six fields per row, whatever the content', () => {
       const notes = ['', ';', ';;;', '"', '""', 'a;b', 'line\nbreak', 'crlf\r\nbreak', '\r', '=SUM(A1)', '"quoted"', ' ', '\t', 'é;ñ"\n'];
       const rows = rowsOf(notes.map((note, i) => expense({ id: `e${i}`, note })));
       expect(rows).toHaveLength(notes.length);
-      for (const row of rows) expect(row).toHaveLength(5);
+      for (const row of rows) expect(row).toHaveLength(6);
     });
 
     it('uses the currency of the formatter', () => {
@@ -669,9 +669,9 @@ describe('expensesToCsv', () => {
 
     it('does not reorder the data it was given', () => {
       const data = appData({ expenses: [expense({ id: 'late', date: '2026-12-01' }), expense({ id: 'early', date: '2026-01-01' })] });
-      expensesToCsv(data, ars);
+      movementsToCsv(data, ars);
       expect(data.expenses.map((e) => e.id)).toEqual(['late', 'early']);
-      expect(() => expensesToCsv(deepFreeze(data), ars)).not.toThrow();
+      expect(() => movementsToCsv(deepFreeze(data), ars)).not.toThrow();
     });
 
     it('handles several thousand rows', () => {
@@ -778,7 +778,7 @@ describe('expensesToCsv', () => {
       const rows = rowsOf(notes.map((note, i) => expense({ id: `e${i}`, note, createdAt: i })));
       expect(rows).toHaveLength(notes.length);
       for (const row of rows) {
-        expect(row).toHaveLength(5);
+        expect(row).toHaveLength(6);
         for (const cell of row) expect(cell).not.toMatch(/^[=+\-@\t\r]/);
       }
       notes.forEach((note, i) => expect(rows[i]![2]).toBe(/^[=+\-@\t\r]/.test(note) ? `'${note}` : note));

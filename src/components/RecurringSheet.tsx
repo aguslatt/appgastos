@@ -60,7 +60,23 @@ export function RecurringSheet({ id, onClose }: { id: string | 'new'; onClose: (
   };
 
   return (
-    <Sheet title={existing ? 'Editar pago fijo' : 'Nuevo pago fijo'} onClose={onClose}>
+    <Sheet
+      title={existing ? 'Editar pago fijo' : 'Nuevo pago fijo'}
+      onClose={onClose}
+      footer={
+        <>
+          <button className="btn btn--block" disabled={!valid} onClick={save}>
+            {existing ? 'Guardar cambios' : 'Crear pago fijo'}
+          </button>
+          {existing && (
+            <button className="btn btn--ghost btn--block" onClick={remove}>
+              <Trash2 size={18} />
+              Eliminar
+            </button>
+          )}
+        </>
+      }
+    >
       <div className="stack">
         <label className="field">
           <span className="field__label">Monto</span>
@@ -107,15 +123,6 @@ export function RecurringSheet({ id, onClose }: { id: string | 'new'; onClose: (
           </div>
         )}
 
-        <button className="btn btn--block" disabled={!valid} onClick={save}>
-          {existing ? 'Guardar cambios' : 'Crear pago fijo'}
-        </button>
-        {existing && (
-          <button className="btn btn--ghost btn--block" onClick={remove}>
-            <Trash2 size={18} />
-            Eliminar
-          </button>
-        )}
       </div>
     </Sheet>
   );

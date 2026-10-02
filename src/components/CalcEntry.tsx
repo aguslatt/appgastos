@@ -1,35 +1,43 @@
 import { CalendarDays, Check, ChevronRight, Delete, FolderPlus, Mic, Sparkles } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { centsToExpr, exprToCents, formatDisplay, formatExpression, hasOperator, pressKey, type CalcKey } from '../lib/calc';
-import { capitalize, formatDayHeading, monthKeyOf, monthName } from '../lib/dates';
+import { capitalize, formatDayHeading, monthKeyOf, monthName, monthShort } from '../lib/dates';
 import { resolveEntry } from '../lib/entry';
-import { describeLive } from '../lib/live';
+import { sumIncomes } from '../lib/income';
+import { incomeSourceFolders } from '../lib/incomeSources';
+import { describeIncomeLive, describeLive } from '../lib/live';
 import { parseExpensePhrase } from '../lib/phrase';
 import { listen, speechSupported, type Listening } from '../lib/speech';
-import { computeMonthStats } from '../lib/stats';
+import { computeMonthStats, sumAmounts } from '../lib/stats';
 import { rankFolders } from '../lib/suggest';
 import type { Cents, DateStr } from '../lib/types';
 import { useKeyboardOpen } from '../state/appearance';
-import { useClassifier, useExpensesByMonth, useFmt, useToday } from '../state/derived';
+import { useClassifier, useExpectedIncome, useExpensesByMonth, useFmt, useIncomeSuggester, useIncomesByMonth, useToday } from '../state/derived';
 import { useData } from '../state/store';
 import { storyToPromote } from '../state/storySeen';
-import { useUi } from '../state/ui';
+import { useUi, type EntryKind } from '../state/ui';
+import { Burst } from './Burst';
 import { cx } from './cx';
 import { DateSheet } from './DateSheet';
 import { FolderPill } from './FolderPill';
 
 export interface EntryResult {
   amount: Cents;
+  /** The folder of an expense, or the source of an income. */
   categoryId: string;
   note: string;
   date: DateStr;
-  /** The folder the AI had suggested for the text, if any (to tell when the user corrected it). */
+  /** The folder or source the suggestion had picked for the text, if any (to tell when the user corrected it). */
   suggestedId: string | null;
 }
 
 interface CalcEntryProps {
   /** "new": tapping a folder saves right away. "edit": folders are selected and ✓ saves. */
   mode: 'new' | 'edit';
+  /** What is being filed: money that left (folders) or money that came in (sources). */
+  kind?: EntryKind;
+  /** When given, the calculator shows the Gasto | Ingreso switch. */
+  onKindChange?: (kind: EntryKind) => void;
   initial?: { amount: Cents; categoryId: string; note: string; date: DateStr };
   onSubmit: (result: EntryResult) => void;
   footer?: ReactNode;
@@ -72,15 +80,20 @@ const PAD: KeyDef[][] = [
 
 const KEY_FOR: Record<string, CalcKey> = { ',': '.', '.': '.', '+': '+', '-': '-', '*': '*', x: '*', X: '*', '/': '/', '%': '%' };
 
-export function CalcEntry({ mode, initial, onSubmit, footer }: CalcEntryProps) {
-  const { settings, categories, expenses } = useData();
+export function CalcEntry({ mode, kind = 'expense', onKindChange, initial, onSubmit, footer }: CalcEntryProps) {
+  const { settings, categories, expenses, incomes } = useData();
   const today = useToday();
   const fmt = useFmt();
   const ui = useUi();
   const classifier = useClassifier();
+  const incomeSuggester = useIncomeSuggester();
   const byMonth = useExpensesByMonth();
+  const incomesByMonth = useIncomesByMonth();
+  const expected = useExpectedIncome();
   const locale = settings.locale;
   const currentMonth = monthKeyOf(today);
+  const isIncome = kind === 'income';
+  const sources = useMemo(() => incomeSourceFolders(), []);
 
   const [expr, setExpr] = useState(() => (initial ? centsToExpr(initial.amount) : ''));
   const [concept, setConcept] = useState(initial?.note ?? '');
@@ -92,6 +105,8 @@ export function CalcEntry({ mode, initial, onSubmit, footer }: CalcEntryProps) {
   const [listening, setListening] = useState(false);
   const [shake, setShake] = useState(0);
   const [nudge, setNudge] = useState(0);
+  const [bump, setBump] = useState(0);
+  const [saved, setSaved] = useState<{ n: number; text: string; income: boolean } | null>(null);
   const [promoTick, setPromoTick] = useState(0);
 
   const rootRef = useRef<HTMLDivElement>(null);
@@ -100,16 +115,29 @@ export function CalcEntry({ mode, initial, onSubmit, footer }: CalcEntryProps) {
   const listenRef = useRef<Listening | null>(null);
   const holdTimer = useRef<number | null>(null);
   const heldBack = useRef(false);
+  const savedCount = useRef(0);
 
   // ---- what the entry means right now
   const entry = useMemo(() => resolveEntry(expr, concept, dateChoice, today), [expr, concept, dateChoice, today]);
-  const suggestion = useMemo(() => (entry.note ? classifier.suggest(entry.note) : null), [classifier, entry.note]);
+  const suggestion = useMemo(() => {
+    if (!entry.note) return null;
+    if (isIncome) {
+      const found = incomeSuggester.suggest(entry.note);
+      return found ? { categoryId: found.sourceId as string, matched: found.matched } : null;
+    }
+    const found = classifier.suggest(entry.note);
+    return found ? { categoryId: found.categoryId, matched: found.matched } : null;
+  }, [isIncome, incomeSuggester, classifier, entry.note]);
   const noteEdited = mode === 'new' || entry.note !== (initial?.note ?? '');
   const suggestedId = noteEdited ? (suggestion?.categoryId ?? null) : null;
   const targetId = mode === 'edit' ? picked : suggestedId;
-  const target = categories.find((c) => c.id === targetId);
+  const pool = isIncome ? sources : categories;
+  const target = pool.find((c) => c.id === targetId);
 
-  const folders = useMemo(() => rankFolders(categories, expenses, today), [categories, expenses, today]);
+  const folders = useMemo(
+    () => (isIncome ? rankFolders(sources, incomes.map((i) => ({ categoryId: i.sourceId, date: i.date })), today) : rankFolders(categories, expenses, today)),
+    [isIncome, sources, incomes, categories, expenses, today],
+  );
   const ordered = useMemo(() => {
     const first = suggestedId ? folders.find((f) => f.id === suggestedId) : undefined;
     return first ? [first, ...folders.filter((f) => f.id !== first.id)] : folders;
@@ -117,33 +145,52 @@ export function CalcEntry({ mode, initial, onSubmit, footer }: CalcEntryProps) {
 
   useEffect(() => {
     pillsRef.current?.scrollTo({ left: 0, behavior: 'smooth' });
-  }, [suggestedId]);
+  }, [suggestedId, isIncome]);
 
   const monthStats = useMemo(() => computeMonthStats(byMonth.get(currentMonth) ?? [], currentMonth, today), [byMonth, currentMonth, today]);
+  const incomeThisMonth = useMemo(() => sumIncomes(incomesByMonth.get(currentMonth) ?? []), [incomesByMonth, currentMonth]);
+
   const live = useMemo(() => {
     if (mode !== 'new' || entry.amount === null) return null;
+    if (isIncome) {
+      const month = monthKeyOf(entry.date);
+      return describeIncomeLive({
+        amount: entry.amount,
+        date: entry.date,
+        today,
+        monthIncome: sumIncomes(incomesByMonth.get(month) ?? []),
+        monthSpent: sumAmounts(byMonth.get(month) ?? []),
+        fmt,
+        locale,
+      });
+    }
     return describeLive({
       amount: entry.amount,
       date: entry.date,
       today,
       stats: monthStats,
       budget: settings.monthlyBudget,
-      income: settings.monthlyIncome,
+      income: expected.amount,
       folder: target ? { name: target.name, limit: target.limit, spent: monthStats.byCategory.find((c) => c.categoryId === target.id)?.total ?? 0 } : null,
       fmt,
       locale,
     });
-  }, [mode, entry.amount, entry.date, today, monthStats, settings.monthlyBudget, settings.monthlyIncome, target, fmt, locale]);
+  }, [mode, isIncome, entry.amount, entry.date, today, monthStats, incomesByMonth, byMonth, settings.monthlyBudget, expected.amount, target, fmt, locale]);
 
   // The month summary is promoted at month's end / in the first days of the next one, until opened.
   const promo = useMemo(
-    () => (mode === 'new' ? storyToPromote(today, expenses, monthStats.daysInMonth) : null),
+    () => (mode === 'new' && !isIncome ? storyToPromote(today, expenses, monthStats.daysInMonth) : null),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [mode, today, expenses, monthStats.daysInMonth, promoTick],
+    [mode, isIncome, today, expenses, monthStats.daysInMonth, promoTick],
   );
 
-  const hint =
-    monthStats.todayTotal > 0
+  const hint = isIncome
+    ? incomeThisMonth > 0
+      ? `Este mes entraron ${fmt.formatRounded(incomeThisMonth)}`
+      : incomes.length === 0
+        ? 'Anota lo que te entra: sueldo, clientes, ventas'
+        : 'Todavía no entró nada este mes'
+    : monthStats.todayTotal > 0
       ? `Hoy llevas ${fmt.formatRounded(monthStats.todayTotal)}`
       : expenses.length === 0
         ? 'Un monto, una carpeta y listo'
@@ -152,6 +199,7 @@ export function CalcEntry({ mode, initial, onSubmit, footer }: CalcEntryProps) {
   // ---- actions
   const press = (key: CalcKey) => {
     ui.haptic('tap');
+    setBump((n) => n + 1);
     setExpr((prev) => pressKey(prev, key));
   };
 
@@ -159,6 +207,13 @@ export function CalcEntry({ mode, initial, onSubmit, footer }: CalcEntryProps) {
     ui.haptic('error');
     setShake((n) => n + 1);
     ui.toast({ text: message, tone: 'bad' });
+  };
+
+  const switchKind = (next: EntryKind) => {
+    if (next === kind) return;
+    ui.haptic('tap');
+    setPicked(null);
+    onKindChange?.(next);
   };
 
   const submit = (categoryId: string) => {
@@ -169,6 +224,7 @@ export function CalcEntry({ mode, initial, onSubmit, footer }: CalcEntryProps) {
     ui.haptic('ok');
     onSubmit({ amount: entry.amount, categoryId, note: entry.note, date: entry.date, suggestedId: suggestion?.categoryId ?? null });
     if (mode === 'new') {
+      setSaved({ n: ++savedCount.current, text: `${isIncome ? '+' : ''}${fmt.format(entry.amount)}`, income: isIncome });
       setExpr('');
       setConcept('');
       setDateChoice(null);
@@ -176,12 +232,18 @@ export function CalcEntry({ mode, initial, onSubmit, footer }: CalcEntryProps) {
     }
   };
 
+  useEffect(() => {
+    if (!saved) return;
+    const id = window.setTimeout(() => setSaved(null), 1100);
+    return () => window.clearTimeout(id);
+  }, [saved]);
+
   const go = () => {
     if (entry.amount === null) return reject('Falta el monto');
     if (!targetId) {
       ui.haptic('error');
       setNudge((n) => n + 1);
-      ui.toast({ text: 'Falta elegir la carpeta', tone: 'bad' });
+      ui.toast({ text: isIncome ? 'Falta elegir de dónde viene' : 'Falta elegir la carpeta', tone: 'bad' });
       return;
     }
     submit(targetId);
@@ -298,50 +360,66 @@ export function CalcEntry({ mode, initial, onSubmit, footer }: CalcEntryProps) {
   );
 
   return (
-    <div ref={rootRef} className={cx('calc', typing && keyboardOpen && 'calc--typing', mode === 'edit' && 'calc--edit')}>
+    <div ref={rootRef} className={cx('calc', typing && keyboardOpen && 'calc--typing', mode === 'edit' && 'calc--edit')} data-kind={kind}>
       <div className="calc__panel">
-        {mode === 'new' && <h1 className="sr-only">Anotar un gasto</h1>}
+        {mode === 'new' && <h1 className="sr-only">{isIncome ? 'Anotar un ingreso' : 'Anotar un gasto'}</h1>}
         {mode === 'new' && (
           <div className="calc__top">
+            {onKindChange && (
+              <div className="kindswitch" role="group" aria-label="Tipo de movimiento" style={{ '--i': isIncome ? 1 : 0 } as CSSProperties}>
+                <button type="button" aria-pressed={!isIncome} onClick={() => switchKind('expense')}>
+                  Gasto
+                </button>
+                <button type="button" aria-pressed={isIncome} onClick={() => switchKind('income')}>
+                  Ingreso
+                </button>
+              </div>
+            )}
             <button
               type="button"
               className="calc__month"
+              aria-label={`Ver el resumen del mes: ${capitalize(monthName(currentMonth, locale))}, ${isIncome ? 'entró' : 'gastado'} ${fmt.formatRounded(isIncome ? incomeThisMonth : monthStats.total)}`}
               onClick={() => {
                 ui.setMonth(currentMonth);
                 ui.setTab('month');
               }}
             >
-              <span>{capitalize(monthName(currentMonth, locale))}</span>
-              <strong>{fmt.formatRounded(monthStats.total)}</strong>
+              <span aria-hidden="true">{capitalize(monthShort(currentMonth, locale))}</span>
+              <strong aria-hidden="true">{isIncome ? `+${fmt.symbol} ${fmt.formatCompact(incomeThisMonth)}` : `${fmt.symbol} ${fmt.formatCompact(monthStats.total)}`}</strong>
               <ChevronRight size={16} strokeWidth={2.6} aria-hidden="true" />
-              <span className="sr-only">Ver el resumen del mes</span>
             </button>
-            {promo && (
-              <button
-                type="button"
-                className="calc__promo"
-                onClick={() => {
-                  ui.openStory(promo);
-                  setPromoTick((t) => t + 1);
-                }}
-              >
-                <Sparkles size={15} aria-hidden="true" />
-                Tu {monthName(promo, locale)}
-              </button>
-            )}
           </div>
+        )}
+        {promo && (
+          <button
+            type="button"
+            className="calc__promo"
+            onClick={() => {
+              ui.openStory(promo);
+              setPromoTick((t) => t + 1);
+            }}
+          >
+            <Sparkles size={15} aria-hidden="true" />
+            Tu {monthName(promo, locale)}
+          </button>
         )}
 
         <div className="calc__display">
           <div className="calc__expr" aria-hidden={!showExpr}>
-            {showExpr ? formatExpression(expr, fmt) : ' '}
+            {showExpr ? formatExpression(expr, fmt) : ' '}
           </div>
           <output key={shake} className={cx('calc__amount', shake > 0 && 'is-shaking')} aria-label="Monto">
-            <span className="calc__cur">{fmt.symbol}</span>
-            <span className="calc__num" style={{ '--n': display.length } as CSSProperties}>
+            <span className="calc__cur">{isIncome ? `+${fmt.symbol}` : fmt.symbol}</span>
+            <span key={bump} className={cx('calc__num', bump > 0 && 'is-bump')} style={{ '--n': display.length } as CSSProperties}>
               {display}
             </span>
           </output>
+          {saved && (
+            <span key={saved.n} className={cx('calc__fly', saved.income && 'calc__fly--in')} aria-hidden="true">
+              {saved.text}
+              {saved.income && <Burst />}
+            </span>
+          )}
         </div>
 
         <div className="calc__concept">
@@ -355,8 +433,8 @@ export function CalcEntry({ mode, initial, onSubmit, footer }: CalcEntryProps) {
             autoCorrect="off"
             spellCheck={false}
             maxLength={80}
-            placeholder="¿En qué? Ej: propina, uber, súper"
-            aria-label="¿En qué gastaste?"
+            placeholder={isIncome ? '¿De qué? Ej: sueldo, cliente, venta' : '¿En qué? Ej: propina, uber, súper'}
+            aria-label={isIncome ? '¿De qué es el ingreso?' : '¿En qué gastaste?'}
             value={concept}
             onChange={(e) => setConcept(e.target.value)}
             onFocus={() => setTyping(true)}
@@ -400,10 +478,12 @@ export function CalcEntry({ mode, initial, onSubmit, footer }: CalcEntryProps) {
             onClick={() => (mode === 'new' ? submit(c.id) : setPicked(c.id))}
           />
         ))}
-        <button type="button" className="pill pill--add" onClick={() => ui.editFolder('new')}>
-          <FolderPlus size={18} aria-hidden="true" />
-          Carpeta
-        </button>
+        {!isIncome && (
+          <button type="button" className="pill pill--add" onClick={() => ui.editFolder('new')}>
+            <FolderPlus size={18} aria-hidden="true" />
+            Carpeta
+          </button>
+        )}
       </div>
 
       <div className="calc__pad" role="group" aria-label="Teclado">
@@ -432,7 +512,7 @@ export function CalcEntry({ mode, initial, onSubmit, footer }: CalcEntryProps) {
 
       {suggestedId && suggestion && target && (
         <p className="sr-only" role="status">
-          Interpreté «{suggestion.matched}»: carpeta {target.name}
+          Interpreté «{suggestion.matched}»: {isIncome ? 'fuente' : 'carpeta'} {target.name}
         </p>
       )}
     </div>

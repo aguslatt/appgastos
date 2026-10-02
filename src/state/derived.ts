@@ -1,9 +1,11 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import { createClassifier, type Classifier } from '../lib/classifier';
 import { todayStr } from '../lib/dates';
+import { expectedIncome, groupIncomesByMonth, type ExpectedIncome } from '../lib/income';
+import { createIncomeSuggester, type IncomeSuggester } from '../lib/incomeSources';
 import { getMoneyFormatter, type MoneyFormatter } from '../lib/money';
 import { groupByMonth } from '../lib/stats';
-import type { Category, DateStr, Expense, MonthKey } from '../lib/types';
+import type { Category, DateStr, Expense, Income, MonthKey } from '../lib/types';
 import { useData } from './store';
 
 /** Today's date, kept fresh when the app stays open across midnight or comes back to the foreground. */
@@ -47,4 +49,21 @@ export function useExpensesByMonth(): Map<MonthKey, Expense[]> {
 export function useClassifier(): Classifier {
   const { categories, expenses } = useData();
   return useMemo(() => createClassifier(categories, expenses), [categories, expenses]);
+}
+
+export function useIncomesByMonth(): Map<MonthKey, Income[]> {
+  const { incomes } = useData();
+  return useMemo(() => groupIncomesByMonth(incomes), [incomes]);
+}
+
+export function useIncomeSuggester(): IncomeSuggester {
+  const { incomes } = useData();
+  return useMemo(() => createIncomeSuggester(incomes), [incomes]);
+}
+
+/** A typical month's income, from the fixed incomes, what else came in lately, or the rough figure in settings. */
+export function useExpectedIncome(): ExpectedIncome {
+  const { incomes, incomeRules, settings } = useData();
+  const today = useToday();
+  return useMemo(() => expectedIncome({ incomes, rules: incomeRules, estimate: settings.monthlyIncome, today }), [incomes, incomeRules, settings.monthlyIncome, today]);
 }

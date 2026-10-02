@@ -1,7 +1,7 @@
 {
-  "name": "Cuánto: gastos en 2 toques",
+  "name": "Cuánto: gastos e ingresos",
   "short_name": "Cuánto",
-  "description": "Anota tus gastos como en una calculadora y mira cuánto gastas cada mes, con un resumen en historias.",
+  "description": "Anota tus gastos e ingresos como en una calculadora y mira cuánto gastas y cuánto te queda cada mes, con un resumen en historias.",
   "lang": "es",
   "dir": "ltr",
   "start_url": "./",
@@ -18,7 +18,8 @@
     { "src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
   ],
   "shortcuts": [
-    { "name": "Anotar un gasto", "short_name": "Anotar", "url": "./?tab=calc", "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }] },
+    { "name": "Anotar un gasto", "short_name": "Gasto", "url": "./?tab=calc", "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }] },
+    { "name": "Anotar un ingreso", "short_name": "Ingreso", "url": "./?tab=calc&kind=income", "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }] },
     { "name": "Ver el mes", "short_name": "Mes", "url": "./?tab=month", "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }] }
   ]
 }

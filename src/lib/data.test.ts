@@ -335,13 +335,13 @@ describe('normalizeData: what counts as a backup', () => {
 
   it('ignores the exportedAt, app and version fields and always reports version 1', () => {
     const data = normalized({ app: 'appgastos', exportedAt: '2026-10-02T12:00:00.000Z', version: 99, expenses: [] });
-    expect(Object.keys(data).sort()).toEqual(['categories', 'expenses', 'goals', 'recurring', 'settings', 'version']);
+    expect(Object.keys(data).sort()).toEqual(['categories', 'expenses', 'goals', 'incomeRules', 'incomes', 'recurring', 'settings', 'version']);
     expect(data.version).toBe(1);
   });
 
   it('only ever returns the known top-level keys', () => {
     const data = normalized({ expenses: [], secret: 'x', __proto__: { polluted: true }, extra: [1, 2, 3] });
-    expect(Object.keys(data).sort()).toEqual(['categories', 'expenses', 'goals', 'recurring', 'settings', 'version']);
+    expect(Object.keys(data).sort()).toEqual(['categories', 'expenses', 'goals', 'incomeRules', 'incomes', 'recurring', 'settings', 'version']);
   });
 });
 

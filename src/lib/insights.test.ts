@@ -217,3 +217,58 @@ describe('shareText', () => {
     expect(text).toContain('Carpeta estrella: 🏠 Hogar (59%).');
   });
 });
+
+// ---- income in the month story ----------------------------------------------------------------
+
+describe('buildStory with income', () => {
+  const income = (total: number) => ({
+    total: total * 100,
+    bySource: [
+      { name: 'Sueldo', emoji: '💼', color: 'green', total: Math.round(total * 0.8) * 100, share: 0.8 },
+      { name: 'Freelance', emoji: '💻', color: 'blue', total: Math.round(total * 0.2) * 100, share: 0.2 },
+    ],
+  });
+  const slideIds = (income?: ReturnType<typeof income_>) => buildStory({ ...ctx(), income }).map((s) => s.id);
+  const income_ = income;
+
+  it('adds an income slide after the intro when money came in', () => {
+    const ids = slideIds(income(800_000));
+    expect(ids.indexOf('income')).toBeGreaterThan(ids.indexOf('intro'));
+    expect(ids.indexOf('income')).toBeLessThan(ids.indexOf('top-folder'));
+  });
+
+  it('does not add one without income, or with nothing that came in', () => {
+    expect(slideIds(undefined)).not.toContain('income');
+    expect(slideIds(income(0))).not.toContain('income');
+    expect(buildStory({ ...ctx(), income: null }).map((s) => s.id)).not.toContain('income');
+  });
+
+  it('says how much was left when income beat spending (September spent 512.500)', () => {
+    const slide = buildStory({ ...ctx(), income: income(800_000) }).find((s) => s.id === 'income');
+    expect(slide?.theme).toBe('blue');
+    expect(plain(slide?.big)).toBe('+$ 287.500');
+    expect(plainTitle(slide?.title ?? '')).toBe('Te quedó');
+    expect(plain(slide?.caption)).toContain('guardaste el 36%');
+    expect(slide?.items?.map((i) => i.label)).toEqual(['Sueldo', 'Freelance']);
+  });
+
+  it('says so when spending beat income', () => {
+    const slide = buildStory({ ...ctx(), income: income(400_000) }).find((s) => s.id === 'income');
+    expect(plain(slide?.big)).toBe('−$ 112.500');
+    expect(plainTitle(slide?.title ?? '')).toBe('Te pasaste');
+    expect(slide?.emoji).toBe('🫠');
+  });
+
+  it('speaks in the present for a month that is still going', () => {
+    const slide = buildStory({ ...ctx({ month: '2026-10', today: '2026-10-15', expenses: [...sept, e('2026-10-02', 10_000, 'super', 'Coto'), e('2026-10-09', 12_000, 'super', 'Coto')] }), income: income(300_000) }).find((s) => s.id === 'income');
+    expect(slide?.kicker).toBe('LO QUE ENTRÓ HASTA HOY');
+    expect(plainTitle(slide?.title ?? '')).toBe('Hasta ahora te queda');
+  });
+
+  it('keeps the share text honest about income', () => {
+    const c = { ...ctx(), income: income(800_000) };
+    expect(plain(shareText(c, null))).toContain('Entraron $ 800.000: me quedaron $ 287.500');
+    expect(plain(shareText({ ...c, income: income(400_000) }, null))).toContain('me pasé por $ 112.500');
+    expect(shareText(ctx(), null)).not.toContain('Entraron');
+  });
+});

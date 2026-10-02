@@ -208,7 +208,7 @@ export function verdictFor(a: MonthAnalysis, f: MoneyFormatter, locale: string):
 
 // ---- story slides -------------------------------------------------------------------
 
-export type SlideTheme = 'green' | 'deep' | 'lime' | 'cream' | 'coral';
+export type SlideTheme = 'green' | 'deep' | 'lime' | 'cream' | 'coral' | 'blue';
 
 export interface SlideItem {
   label: string;
@@ -235,10 +235,17 @@ export interface StorySlide {
   weekdayBars?: { values: number[]; highlight: number };
 }
 
+/** What came in during the month, when the person records income. */
+export interface IncomeSummary {
+  total: Cents;
+  bySource: Array<{ name: string; emoji: string; color: string; total: Cents; share: number }>;
+}
+
 export interface StoryContext {
   analysis: MonthAnalysis;
   fmt: MoneyFormatter;
   locale: string;
+  income?: IncomeSummary | null;
 }
 
 const upper = (s: string): string => s.toLocaleUpperCase();
@@ -248,7 +255,7 @@ const emphasizeLast = (text: string): string => text.replace(/(\S+)$/, '*$1*');
 export const plainTitle = (text: string): string => text.replace(/\*/g, '');
 const pluralDay = (name: string): string => (name.endsWith('s') ? name : `${name}s`);
 
-export function buildStory({ analysis: a, fmt: f, locale }: StoryContext): StorySlide[] {
+export function buildStory({ analysis: a, fmt: f, locale, income }: StoryContext): StorySlide[] {
   const { stats } = a;
   const month = monthName(a.month, locale);
   const prevMonth = monthName(addMonths(a.month, -1), locale);
@@ -286,6 +293,24 @@ export function buildStory({ analysis: a, fmt: f, locale }: StoryContext): Story
       emoji: verdict.emoji,
       title: emphasizeLast(verdict.label),
       caption: verdict.reason,
+    });
+  }
+
+  if (income && income.total > 0) {
+    const kept = income.total - stats.total;
+    const keptShare = kept / income.total;
+    slides.push({
+      id: 'income',
+      theme: 'blue',
+      kicker: isCurrent ? 'LO QUE ENTRÓ HASTA HOY' : 'LO QUE ENTRÓ',
+      emoji: kept >= 0 ? '💰' : '🫠',
+      title: kept >= 0 ? (isCurrent ? 'Hasta ahora *te queda*' : 'Te *quedó*') : isCurrent ? 'Hasta ahora *vas pasado*' : 'Te *pasaste*',
+      big: `${kept >= 0 ? '+' : '−'}${f.formatRounded(Math.abs(kept))}`,
+      caption:
+        kept >= 0
+          ? `Entraron ${f.formatRounded(income.total)} y gastaste ${f.formatRounded(stats.total)}: guardaste el ${pct(keptShare)}.`
+          : `Entraron ${f.formatRounded(income.total)} y gastaste ${f.formatRounded(stats.total)}.`,
+      items: income.bySource.slice(0, 3).map((s) => ({ label: s.name, value: f.formatRounded(s.total), emoji: s.emoji, color: s.color, share: s.share })),
     });
   }
 
@@ -468,9 +493,13 @@ export function buildFacts({ analysis: a, fmt: f, locale }: StoryContext): Fact[
 }
 
 /** Plain-text recap for the share sheet. */
-export function shareText({ analysis: a, fmt: f, locale }: StoryContext, verdict: Verdict | null): string {
+export function shareText({ analysis: a, fmt: f, locale, income }: StoryContext, verdict: Verdict | null): string {
   const { stats } = a;
   const lines = [`Mi ${monthName(a.month, locale)}: ${f.formatRounded(stats.total)} en ${stats.count} movimientos.`];
+  if (income && income.total > 0) {
+    const kept = income.total - stats.total;
+    lines.push(`💰 Entraron ${f.formatRounded(income.total)}: ${kept >= 0 ? `me quedaron ${f.formatRounded(kept)}` : `me pasé por ${f.formatRounded(-kept)}`}.`);
+  }
   if (verdict) lines.push(`${verdict.emoji} ${verdict.label}. ${verdict.reason}`);
   const first = a.folders[0];
   if (first?.category) lines.push(`Carpeta estrella: ${first.category.emoji} ${first.category.name} (${pct(first.share)}).`);

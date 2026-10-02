@@ -1,27 +1,30 @@
-import { ChevronRight, Download, FileSpreadsheet, FolderPlus, Plus, Share, Smartphone, Sparkles, Trash2, Upload } from 'lucide-react';
+import { ArrowUpRight, ChevronRight, Download, FileSpreadsheet, FolderPlus, Plus, Share, Smartphone, Sparkles, Trash2, Upload } from 'lucide-react';
 import { useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { AiSettings } from '../components/AiSettings';
 import { BudgetSheet } from '../components/BudgetSheet';
-import { IncomeSheet } from '../components/IncomeSheet';
+import { IncomeEstimateSheet } from '../components/IncomeEstimateSheet';
+import { IncomeRuleSheet } from '../components/IncomeRuleSheet';
 import { ImportSheet } from '../components/ImportSheet';
 import { RecurringSheet } from '../components/RecurringSheet';
 import { cx } from '../components/cx';
-import { backupFileName, expensesToCsv, parseBackup, serializeBackup } from '../lib/backup';
+import { backupFileName, movementsToCsv, parseBackup, serializeBackup } from '../lib/backup';
 import { colorVar } from '../lib/categories';
 import { makeIdGenerator } from '../lib/data';
 import { formatShortDate } from '../lib/dates';
-import { generateDemo } from '../lib/demo';
+import { generateDemo, generateDemoIncomes } from '../lib/demo';
+import { nextPaydays } from '../lib/income';
+import { incomeSource } from '../lib/incomeSources';
 import { saveTextFile } from '../lib/files';
 import { CURRENCIES, getMoneyFormatter } from '../lib/money';
 import { nextPayments } from '../lib/recurring';
 import type { AppData, ThemePref } from '../lib/types';
-import { useCategoryMap, useFmt, useToday } from '../state/derived';
+import { useCategoryMap, useExpectedIncome, useFmt, useToday } from '../state/derived';
 import { aiConfig } from '../state/ai';
 import { useInstall } from '../state/install';
 import { store, useData } from '../state/store';
 import { useUi } from '../state/ui';
 
-type Sheet = { kind: 'budget' } | { kind: 'income' } | { kind: 'recurring'; id: string } | { kind: 'import'; data: AppData };
+type Sheet = { kind: 'budget' } | { kind: 'estimate' } | { kind: 'incomeRule'; id: string } | { kind: 'recurring'; id: string } | { kind: 'import'; data: AppData };
 
 const THEMES: Array<{ id: ThemePref; label: string }> = [
   { id: 'system', label: 'Automático' },
@@ -61,9 +64,10 @@ function ValueRow({ title, sub, value, onClick }: { title: string; sub?: string;
 }
 
 export function SettingsScreen() {
-  const { settings, categories, recurring, expenses } = useData();
+  const { settings, categories, recurring, expenses, incomes, incomeRules } = useData();
   const fmt = useFmt();
   const today = useToday();
+  const expected = useExpectedIncome();
   const ui = useUi();
   const install = useInstall();
   const catMap = useCategoryMap();
@@ -72,9 +76,11 @@ export function SettingsScreen() {
 
   const active = categories.filter((c) => !c.archived);
   const hidden = categories.filter((c) => c.archived);
-  const hasDemo = expenses.some((e) => e.demo);
+  const hasDemo = expenses.some((e) => e.demo) || incomes.some((i) => i.demo);
   const payments = nextPayments(recurring, today);
   const paused = recurring.filter((r) => !r.active);
+  const paydays = nextPaydays(incomeRules, today);
+  const pausedIncome = incomeRules.filter((r) => !r.active);
   const lastBackup = readLastBackup();
 
   const stamp = () => {
@@ -93,7 +99,7 @@ export function SettingsScreen() {
   };
 
   const exportCsv = async () => {
-    const result = await saveTextFile(backupFileName('csv', today), expensesToCsv(store.getData(), getMoneyFormatter(settings.locale, settings.currency)), 'text/csv');
+    const result = await saveTextFile(backupFileName('csv', today), movementsToCsv(store.getData(), getMoneyFormatter(settings.locale, settings.currency)), 'text/csv');
     if (result !== 'cancelled') ui.toast({ text: result === 'shared' ? 'Planilla lista para guardar' : 'Planilla descargada' });
   };
 
@@ -109,19 +115,20 @@ export function SettingsScreen() {
 
   const loadDemo = () => {
     const n = store.addDemoExpenses(generateDemo({ today, currency: settings.currency, categories }));
-    ui.toast({ text: `Listo: ${n} gastos de ejemplo de los últimos meses` });
+    const m = store.addDemoIncomes(generateDemoIncomes({ today, currency: settings.currency }));
+    ui.toast({ text: `Listo: ${n} gastos y ${m} ingresos de ejemplo de los últimos meses` });
     ui.setTab('month');
   };
 
   const removeDemo = () => {
-    const n = store.removeDemoExpenses();
-    ui.toast({ text: `Se quitaron ${n} gastos de ejemplo` });
+    const n = store.removeDemoExpenses() + store.removeDemoIncomes();
+    ui.toast({ text: `Se quitaron ${n} movimientos de ejemplo` });
   };
 
   const wipe = async () => {
     const ok = await ui.confirm({
       title: '¿Borrar todo?',
-      text: 'Se eliminan gastos, carpetas, ajustes y la clave de la IA de este teléfono. No se puede deshacer. Si no hiciste una copia, se pierde.',
+      text: 'Se eliminan gastos, ingresos, carpetas, ajustes y la clave de la IA de este teléfono. No se puede deshacer. Si no hiciste una copia, se pierde.',
       confirmLabel: 'Borrar todo',
       danger: true,
     });
@@ -145,7 +152,6 @@ export function SettingsScreen() {
       <Section title="Tu plata">
         <div className="list">
           <ValueRow title="Presupuesto mensual" sub="Para ver cuánto queda por día" value={settings.monthlyBudget ? fmt.formatRounded(settings.monthlyBudget) : 'Sin definir'} onClick={() => setSheet({ kind: 'budget' })} />
-          <ValueRow title="Ingreso mensual" sub="Opcional: gastos en horas de trabajo" value={settings.monthlyIncome ? fmt.formatRounded(settings.monthlyIncome) : 'Sin definir'} onClick={() => setSheet({ kind: 'income' })} />
           <label className="row">
             <span className="row__main">
               <span className="row__title">Moneda</span>
@@ -165,6 +171,75 @@ export function SettingsScreen() {
               ))}
             </select>
           </label>
+        </div>
+      </Section>
+
+      <Section title="Ingresos" note="Si cobras un sueldo, cárgalo una vez y se anota solo todos los meses. Si cobras por trabajo, anota cada ingreso cuando te entra, desde la calculadora.">
+        {expected.amount !== null && (
+          <div className="incomecard">
+            <span className="kicker">Un mes típico</span>
+            <strong className="incomecard__amount tnum">{fmt.formatRounded(expected.amount)}</strong>
+            <span className="incomecard__basis">
+              {expected.basis === 'fixed'
+                ? 'Tu ingreso fijo'
+                : expected.basis === 'mixed'
+                  ? 'Tu ingreso fijo más lo que suele entrar encima'
+                  : expected.basis === 'history'
+                    ? 'El promedio de tus últimos meses'
+                    : 'El número aproximado que pusiste'}
+            </span>
+          </div>
+        )}
+        {paydays.length + pausedIncome.length > 0 && (
+          <div className="list">
+            {paydays.map(({ rule, date }) => {
+              const source = incomeSource(rule.sourceId);
+              return (
+                <button key={rule.id} type="button" className="row" onClick={() => setSheet({ kind: 'incomeRule', id: rule.id })}>
+                  <span className="badge badge--in" style={{ '--badge-color': colorVar(source.color) } as CSSProperties}>
+                    {source.emoji}
+                  </span>
+                  <span className="row__main">
+                    <span className="row__title">{rule.note || source.name}</span>
+                    <span className="row__sub">Próximo cobro: {formatShortDate(date, settings.locale)}</span>
+                  </span>
+                  <span className="row__end row__end--in tnum">+{fmt.formatRounded(rule.amount)}</span>
+                </button>
+              );
+            })}
+            {pausedIncome.map((rule) => {
+              const source = incomeSource(rule.sourceId);
+              return (
+                <button key={rule.id} type="button" className="row row--paused" onClick={() => setSheet({ kind: 'incomeRule', id: rule.id })}>
+                  <span className="badge badge--in" style={{ '--badge-color': colorVar(source.color) } as CSSProperties}>
+                    {source.emoji}
+                  </span>
+                  <span className="row__main">
+                    <span className="row__title">{rule.note || source.name}</span>
+                    <span className="row__sub">En pausa</span>
+                  </span>
+                  <span className="row__end tnum">+{fmt.formatRounded(rule.amount)}</span>
+                </button>
+              );
+            })}
+          </div>
+        )}
+        <button className="btn btn--soft btn--block section__action" onClick={() => setSheet({ kind: 'incomeRule', id: 'new' })}>
+          <Plus size={18} />
+          Agregar sueldo o ingreso fijo
+        </button>
+        <button
+          className="btn btn--soft btn--block section__action"
+          onClick={() => {
+            ui.setEntryKind('income');
+            ui.setTab('calc');
+          }}
+        >
+          <ArrowUpRight size={18} />
+          Anotar un ingreso
+        </button>
+        <div className="list section__action">
+          <ValueRow title="Ingreso aproximado" sub="Para quien prefiere no anotar nada" value={settings.monthlyIncome ? fmt.formatRounded(settings.monthlyIncome) : 'Sin definir'} onClick={() => setSheet({ kind: 'estimate' })} />
         </div>
       </Section>
 
@@ -346,7 +421,7 @@ export function SettingsScreen() {
             <Trash2 size={20} aria-hidden="true" />
             <span className="row__main">
               <span className="row__title">Borrar todo</span>
-              <span className="row__sub">Gastos, carpetas, ajustes y clave de IA</span>
+              <span className="row__sub">Gastos, ingresos, carpetas, ajustes y clave de IA</span>
             </span>
           </button>
         </div>
@@ -363,7 +438,8 @@ export function SettingsScreen() {
       </p>
 
       {sheet?.kind === 'budget' && <BudgetSheet onClose={() => setSheet(null)} />}
-      {sheet?.kind === 'income' && <IncomeSheet onClose={() => setSheet(null)} />}
+      {sheet?.kind === 'estimate' && <IncomeEstimateSheet onClose={() => setSheet(null)} />}
+      {sheet?.kind === 'incomeRule' && <IncomeRuleSheet id={sheet.id} onClose={() => setSheet(null)} />}
       {sheet?.kind === 'recurring' && <RecurringSheet id={sheet.id} onClose={() => setSheet(null)} />}
       {sheet?.kind === 'import' && <ImportSheet incoming={sheet.data} onClose={() => setSheet(null)} />}
     </div>

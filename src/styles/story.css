@@ -10,6 +10,23 @@
   background: var(--s-bg);
   color: var(--s-ink);
   transition: background-color 0.4s ease, color 0.4s ease;
+  overflow: hidden;
+  isolation: isolate;
+}
+
+/* a big soft light that drifts behind every slide */
+.story::before {
+  content: '';
+  position: absolute;
+  top: -22%;
+  right: -34%;
+  z-index: -1;
+  width: 120%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: radial-gradient(circle at 40% 40%, color-mix(in srgb, var(--s-ink) 13%, transparent), transparent 66%);
+  animation: drift 16s ease-in-out infinite;
+  pointer-events: none;
 }
 
 .story[data-theme='deep'] {
@@ -25,11 +42,27 @@
 .story[data-theme='cream'] {
   --s-bg: var(--slide-cream-bg);
   --s-ink: var(--slide-cream-ink);
+  /* This slide is cream in both themes, so the form on it (onboarding's last step) always wears the light colors. */
+  --ink: #08241d;
+  --ink-2: #3d5850;
+  --muted: #526b64;
+  --card: #ffffff;
+  --card-2: #efeadb;
+  --card-3: #e2ddc8;
+  --line: rgba(8, 36, 29, 0.1);
+  --hairline: rgba(8, 36, 29, 0.06);
+  --mark: #0a8f43;
+  --bg: #f5f1e6;
 }
 
 .story[data-theme='coral'] {
   --s-bg: var(--slide-coral-bg);
   --s-ink: var(--slide-coral-ink);
+}
+
+.story[data-theme='blue'] {
+  --s-bg: var(--slide-blue-bg);
+  --s-ink: var(--slide-blue-ink);
 }
 
 .story__bars {
@@ -129,6 +162,7 @@
   margin: 14px 0 4px;
   font-size: 64px;
   line-height: 1;
+  animation: pop 0.6s var(--spring) 0.1s both;
 }
 
 .story__title {
@@ -171,6 +205,8 @@
 }
 
 .story__chips li {
+  animation: chip-in 0.55s var(--ease) both;
+  animation-delay: calc(0.18s + var(--k, 0) * 0.09s);
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -190,6 +226,17 @@
   height: 10px;
   border-radius: 50%;
   background: var(--dot);
+}
+
+@keyframes chip-in {
+  from {
+    opacity: 0;
+    transform: translateY(14px) rotate(var(--tilt, 0deg)) scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: rotate(var(--tilt, 0deg));
+  }
 }
 
 .story__chips b {

@@ -1,13 +1,14 @@
-import { ChevronRight } from 'lucide-react';
+import { ChevronRight, Minus, Plus } from 'lucide-react';
 import { useState, type CSSProperties } from 'react';
-import { todayStr } from '../lib/dates';
-import { generateDemo } from '../lib/demo';
+import { monthKeyOf, todayStr } from '../lib/dates';
+import { generateDemo, generateDemoIncomes } from '../lib/demo';
 import { CURRENCIES, parseAmountText } from '../lib/money';
 import { useInstall } from '../state/install';
 import { store, useData } from '../state/store';
 import { cx } from './cx';
 
-type Theme = 'green' | 'deep' | 'lime' | 'cream';
+type Theme = 'green' | 'deep' | 'lime' | 'cream' | 'blue';
+type Pay = 'fixed' | 'work' | 'later';
 
 interface Slide {
   theme: Theme;
@@ -41,6 +42,17 @@ const SLIDES: Slide[] = [
     ],
   },
   {
+    theme: 'blue',
+    kicker: 'LO QUE ENTRA',
+    title: 'Anota también *lo que cobras*',
+    caption: 'Un sueldo fijo se carga una vez y se anota solo. Si cobras por trabajo, lo anotas cuando te entra. Siempre sabes cuánto te queda.',
+    chips: [
+      { text: '💼 Sueldo', tilt: -3 },
+      { text: '💻 Cliente nuevo', tilt: 2.5 },
+      { text: '💰 Te quedan $ 380.000', tilt: -1.5 },
+    ],
+  },
+  {
     theme: 'lime',
     kicker: 'A FIN DE MES',
     title: 'Tu resumen en *historias*',
@@ -67,22 +79,33 @@ export function Onboarding() {
   const [step, setStep] = useState(0);
   const [currency, setCurrency] = useState(settings.currency);
   const [budgetText, setBudgetText] = useState('');
+  const [pay, setPay] = useState<Pay>('later');
+  const [salaryText, setSalaryText] = useState('');
+  const [payDay, setPayDay] = useState(1);
   const setup = step === SLIDES.length;
   const slide = SLIDES[step];
   const budget = budgetText.trim() === '' ? null : parseAmountText(budgetText);
   const budgetInvalid = budgetText.trim() !== '' && (budget === null || budget <= 0);
+  const salary = salaryText.trim() === '' ? null : parseAmountText(salaryText);
+  const salaryInvalid = pay === 'fixed' && salaryText.trim() !== '' && (salary === null || salary <= 0);
 
   const finish = (withDemo = false) => {
     store.updateSettings({ currency, monthlyBudget: budgetInvalid ? null : budget, onboarded: true });
+    if (pay === 'fixed' && salary !== null && salary > 0 && !withDemo) {
+      // Counted from this month: if payday already went by, this month's pay is recorded right away.
+      store.addIncomeRule({ amount: salary, sourceId: 'sueldo', note: 'Sueldo', day: payDay, startMonth: monthKeyOf(todayStr()) });
+      store.runIncomeRules(todayStr());
+    }
     if (withDemo) {
       store.addDemoExpenses(generateDemo({ today: todayStr(), currency, categories }));
+      store.addDemoIncomes(generateDemoIncomes({ today: todayStr(), currency }));
     }
     // Ask the browser not to clear our data when space is tight (best effort).
     void navigator.storage?.persist?.();
   };
 
   return (
-    <div className="story ob" data-theme={setup ? 'cream' : slide?.theme}>
+    <main className="story ob" data-theme={setup ? 'cream' : slide?.theme}>
       <div className="story__bars" aria-hidden="true">
         {[...SLIDES, null].map((_, i) => (
           <i key={i} className={cx(i <= step && 'is-done')} />
@@ -134,6 +157,43 @@ export function Onboarding() {
                   <span className="field__label">Tope de gasto mensual (opcional)</span>
                   <input className="input" inputMode="decimal" placeholder="Lo puedes definir después" value={budgetText} aria-invalid={budgetInvalid} onChange={(e) => setBudgetText(e.target.value)} />
                 </label>
+                <div className="field">
+                  <span className="field__label">¿Cómo cobras?</span>
+                  <div className="segmented" role="group" aria-label="Cómo cobras">
+                    <button type="button" className="segmented__item" aria-pressed={pay === 'fixed'} onClick={() => setPay('fixed')}>
+                      Sueldo fijo
+                    </button>
+                    <button type="button" className="segmented__item" aria-pressed={pay === 'work'} onClick={() => setPay('work')}>
+                      Por trabajo
+                    </button>
+                    <button type="button" className="segmented__item" aria-pressed={pay === 'later'} onClick={() => setPay('later')}>
+                      Después
+                    </button>
+                  </div>
+                </div>
+                {pay === 'fixed' && (
+                  <>
+                    <label className="field">
+                      <span className="field__label">Sueldo por mes</span>
+                      <input className="input" inputMode="decimal" placeholder="Lo que te llega a la mano" value={salaryText} aria-invalid={salaryInvalid} onChange={(e) => setSalaryText(e.target.value)} />
+                    </label>
+                    <div className="field">
+                      <span className="field__label">Te pagan el día</span>
+                      <div className="stepper">
+                        <button type="button" className="icon-btn" aria-label="Un día antes" onClick={() => setPayDay((d) => Math.max(1, d - 1))}>
+                          <Minus size={20} />
+                        </button>
+                        <output className="stepper__value" aria-live="polite">
+                          {payDay}
+                        </output>
+                        <button type="button" className="icon-btn" aria-label="Un día después" onClick={() => setPayDay((d) => Math.min(31, d + 1))}>
+                          <Plus size={20} />
+                        </button>
+                      </div>
+                    </div>
+                  </>
+                )}
+                {pay === 'work' && <p className="field__hint">Perfecto: cuando te entre plata, cambia a «Ingreso» en la calculadora y anótalo. Así ves cuánto te queda cada mes.</p>}
                 {!install.standalone && (install.canPrompt || install.ios) && (
                   <p className="field__hint">
                     {install.ios ? 'Tip: en Safari toca Compartir → «Agregar a pantalla de inicio» para usarla como app.' : 'Tip: instálala desde Ajustes para abrirla como una calculadora.'}
@@ -148,7 +208,7 @@ export function Onboarding() {
       <div className="story__foot ob__foot">
         {setup ? (
           <div className="ob__actions">
-            <button className="btn btn--dark btn--block" disabled={budgetInvalid} onClick={() => finish()}>
+            <button className="btn btn--dark btn--block" disabled={budgetInvalid || salaryInvalid} onClick={() => finish()}>
               Empezar
             </button>
             <button className="link-btn" onClick={() => finish(true)}>
@@ -165,6 +225,6 @@ export function Onboarding() {
           </>
         )}
       </div>
-    </div>
+    </main>
   );
 }
