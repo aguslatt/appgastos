@@ -1,4 +1,4 @@
-// Independent tests for income.ts, incomeSources.ts and the generic schedule in recurring.ts. A test marked "BUG:" was
+// Tests for income.ts, incomeSources.ts and the generic schedule in recurring.ts. A test marked "BUG:" was
 // written against a defect found in the source: the comment says what the right behaviour is.
 import { describe, expect, it } from 'vitest';
 import { isColorKey } from './categories';
@@ -252,10 +252,15 @@ describe('expectedIncome', () => {
       expect(expect$({ incomes: [at('2026-08-03', 1), at('2026-09-03', 4)] }).variable).toBe(3);
     });
 
-    // documents current behaviour (spec silent): a single old income gives a variable part of 0, not "unknown",
-    // so the rough figure is not used and the expected income reads 0
-    it('reads zero (not unknown) when the only income is older than the three months', () => {
-      expect(expect$({ incomes: [at('2026-01-02', 5000)], estimate: 400 })).toEqual({ amount: 0, basis: 'history', fixed: 0, variable: 0 });
+    // A stretch with nothing recorded says nothing about what is typical (the app may just not have been used),
+    // so it is not an income of zero: the rough figure takes over, or nothing.
+    it('does not read an empty stretch as an income of zero: the rough figure takes over, or nothing', () => {
+      expect(expect$({ incomes: [at('2026-01-02', 5000)], estimate: 400 })).toEqual({ amount: 400, basis: 'estimate', fixed: 0, variable: 0 });
+      expect(expect$({ incomes: [at('2026-01-02', 5000)] })).toEqual({ amount: null, basis: 'none', fixed: 0, variable: 0 });
+    });
+
+    it('a fixed income with an empty stretch next to it is just the fixed income', () => {
+      expect(expect$({ rules: [rule({ amount: 100_000 })], incomes: [at('2026-01-02', 5000)] })).toEqual({ amount: 100_000, basis: 'fixed', fixed: 100_000, variable: 0 });
     });
   });
 
@@ -561,7 +566,8 @@ describe('expectedIncome properties (4000 random situations)', () => {
         }
       }
     }
-    if (fixed > 0 || variable !== null) return { amount: fixed + (variable ?? 0), basis: fixed > 0 && variable !== null ? 'mixed' : fixed > 0 ? 'fixed' : 'history', fixed, variable };
+    const onTop = variable !== null && variable > 0 ? variable : null; // an empty stretch is not an income of zero
+    if (fixed > 0 || onTop !== null) return { amount: fixed + (onTop ?? 0), basis: fixed > 0 && onTop !== null ? 'mixed' : fixed > 0 ? 'fixed' : 'history', fixed, variable };
     if (o.estimate !== null && o.estimate > 0) return { amount: o.estimate, basis: 'estimate', fixed, variable };
     return { amount: null, basis: 'none', fixed, variable };
   }
@@ -808,8 +814,11 @@ describe('createIncomeSuggester: keywords', () => {
   });
 
   it('matches stems by prefix, but never a keyword that is only part of a word or of a phrase', () => {
-    for (const [text, expected] of [['vendedor', 'venta'], ['clasecita', 'freelance'], ['clientela', 'freelance'], ['facturado', 'freelance'], ['criptomonedas', 'inversiones'], ['reintegros', 'reintegro']] as const) expect(guess(text)).toBe(expected);
-    for (const text of ['sueldosity', 'presueldo', 'abonó', 'inventario', 'cumplir', 'clasificar', 'rentable', 'plazo fijoxyz', 'xplazo fijo', 'pagoxmensual', 'mercado libreria', 'nota de creditos2']) expect(guess(text)).toBeNull();
+    for (const [text, expected] of [['vendedor', 'venta'], ['vendiendo', 'venta'], ['facturado', 'freelance'], ['facturación', 'freelance'], ['criptomonedas', 'inversiones'], ['reintegros', 'reintegro'], ['reintegraron', 'reintegro'], ['regalito', 'regalo']] as const) expect(guess(text)).toBe(expected);
+    // words that only start like a keyword are not that keyword: most keywords are whole words (plurals count), only a few are stems
+    for (const text of ['sueldosity', 'presueldo', 'abonó', 'inventario', 'cumplir', 'clasificar', 'rentable', 'plazo fijoxyz', 'xplazo fijo', 'pagoxmensual', 'mercado libreria', 'nota de creditos2', 'ventana', 'ventaja', 'ventanilla', 'interesante', 'cumplen', 'clientela', 'clasecita']) expect(guess(text)).toBeNull();
+    // the everyday words people use for work are covered
+    for (const text of ['freelancer', 'laburo', 'laburito', 'un cliente', 'changas', 'honorarios', 'clases particulares']) expect(guess(text)).toBe('freelance');
   });
 
   // documents current behaviour (spec silent): the first source in the list that matches wins

@@ -18,7 +18,7 @@ interface SourceDef {
   emoji: string;
   /** Key into the category palette (see `categories.ts`). */
   color: string;
-  /** Words that point at this source; a trailing `*` matches any ending ("vend*" = vendí, vendido...). */
+  /** Words that point at this source (plurals count); a trailing `*` matches any ending ("vend*" = vendí, vendido...), so use it sparingly. */
   words: string;
 }
 
@@ -36,35 +36,35 @@ const SOURCES: readonly SourceDef[] = [
     emoji: '💻',
     color: 'blue',
     words:
-      'freelance, free lance, cliente*, proyecto*, factura*, honorario*, changa*, trabajito*, consultoria, diseno, desarrollo, programacion, clase*, edicion, traduccion, fotografia, sesion, comision*, presupuesto',
+      'freelance, freelancer, free lance, cliente, proyecto, factur*, honorario, changa, laburo, laburito, trabajito, consultoria, diseno, desarrollo, programacion, clase, edicion, traduccion, fotografia, sesion, comision, presupuesto',
   },
   {
     id: 'venta',
     name: 'Ventas',
     emoji: '🏷️',
     color: 'orange',
-    words: 'venta*, vend*, mercado libre, mercadolibre, marketplace, usado*, olx, wallapop',
+    words: 'venta, vend*, mercado libre, mercadolibre, marketplace, usado, olx, wallapop',
   },
   {
     id: 'regalo',
     name: 'Regalo',
     emoji: '🎁',
     color: 'magenta',
-    words: 'regalo*, regalaron, cumple*, cumpleanos, mesada, me dieron, mama, papa, abuela, abuelo, padres',
+    words: 'regal*, cumple, cumpleanos, mesada, me dieron, mama, papa, abuela, abuelo, padres',
   },
   {
     id: 'reintegro',
     name: 'Reintegro',
     emoji: '↩️',
     color: 'sky',
-    words: 'reintegro*, devolucion*, devolvieron, devolvio, reembolso*, cashback, nota de credito, me pagaron lo que',
+    words: 'reintegr*, devolucion, devolvieron, devolvio, reembolso, cashback, nota de credito, me pagaron lo que',
   },
   {
     id: 'inversiones',
     name: 'Inversiones',
     emoji: '📈',
     color: 'violet',
-    words: 'interes*, dividendo*, plazo fijo, rendimiento*, ganancia*, cripto*, acciones, inversion*, alquiler*, renta, airbnb, fci',
+    words: 'interes, dividendo, plazo fijo, rendimiento, ganancia, cripto*, acciones, inversion, alquiler, renta, airbnb, fci',
   },
   { id: 'otros', name: 'Otros', emoji: '✨', color: 'slate', words: '' },
 ];

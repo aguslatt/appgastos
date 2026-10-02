@@ -1,4 +1,4 @@
-// Independent tests for how incomes and fixed incomes are repaired on load (normalizeData), backed up and merged,
+// Tests for how incomes and fixed incomes are repaired on load (normalizeData), backed up and merged,
 // exported to CSV, and sampled (generateDemoIncomes), with hostile input throughout.
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { BACKUP_APP_ID, mergeData, movementsToCsv, parseBackup, serializeBackup } from './backup';
@@ -170,6 +170,14 @@ describe.each(KINDS)('normalizeData: $label records', (kind) => {
       expect(list[1]!.id).toBe('gen-1');
       expect(list[3]!.id).toBe('gen-3');
       expect(list[6]!.id).toBe('gen-2');
+    });
+
+    it('reserves an explicit id in the form it will be stored (trimmed, cut at 60), so a generated id never takes it', () => {
+      const padded = many([kind.raw({ id: undefined }), kind.raw({ id: '  gen-1  ' })]);
+      expect(padded.map((x) => x.id)).toEqual(['gen-2', 'gen-1']);
+      const answers = ['a'.repeat(60), 'free'];
+      const long = many([kind.raw({ id: undefined }), kind.raw({ id: 'a'.repeat(70) })], { makeId: () => answers.shift()! });
+      expect(long.map((x) => x.id)).toEqual(['free', 'a'.repeat(60)]);
     });
 
     it('skips a generator that repeats itself or hands out a taken id', () => {

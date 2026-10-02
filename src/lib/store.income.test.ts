@@ -1,4 +1,4 @@
-// Independent tests for the income side of the store: incomes, fixed incomes, demo data, and what a reload gives back.
+// Tests for the income side of the store: incomes, fixed incomes, demo data, and what a reload gives back.
 // A test marked "BUG:" was written against a defect found in the source: the comment says what the right behaviour is.
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { normalizeData } from './data';
@@ -381,6 +381,17 @@ describe('resuming a paused fixed income', () => {
     store.updateIncomeRule(r.id, { active: false });
     store.updateIncomeRule(r.id, { active: true });
     expect(store.getData().incomeRules[0]!.lastGenerated).toBe('2026-09');
+  });
+
+  it('does the same when the day it is given is not a date, without throwing', () => {
+    for (const junk of ['garbage', '2026-13-45', '2026-10', '']) {
+      const store = createStore({ storage: null, makeId: seqIds('r'), now: () => new Date(2026, 9, 12, 12).getTime() });
+      const r = store.addIncomeRule({ amount: 5, sourceId: 'sueldo', day: 10, startMonth: '2026-05' });
+      store.updateIncomeRule(r.id, { active: false });
+      expect(() => store.updateIncomeRule(r.id, { active: true }, junk)).not.toThrow();
+      expect(store.getData().incomeRules[0]).toMatchObject({ active: true, lastGenerated: '2026-09' });
+      expect([store.runIncomeRules('2026-10-12'), dates(store)]).toEqual([1, ['2026-10-10']]);
+    }
   });
 });
 

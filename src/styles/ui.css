@@ -888,6 +888,13 @@ button.row:active {
   padding: 4px 0;
 }
 
+/* a switch row explains itself in a full sentence: let it wrap instead of cutting it short */
+.row--plain .row__sub {
+  overflow: visible;
+  text-overflow: clip;
+  white-space: normal;
+}
+
 .folder-danger {
   display: flex;
   flex-direction: column;

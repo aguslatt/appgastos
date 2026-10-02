@@ -15,7 +15,7 @@ import { Sheet } from './Sheet';
  * every month, so the month always shows what came in without lifting a finger.
  */
 export function IncomeRuleSheet({ id, onClose }: { id: string | 'new'; onClose: () => void }) {
-  const { incomeRules } = useData();
+  const { incomeRules, incomes } = useData();
   const today = useToday();
   const fmt = useFmt();
   const ui = useUi();
@@ -27,13 +27,18 @@ export function IncomeRuleSheet({ id, onClose }: { id: string | 'new'; onClose: 
   const [day, setDay] = useState(existing?.day ?? 1);
   const [sourceId, setSourceId] = useState(existing?.sourceId ?? 'sueldo');
   const [active, setActive] = useState(existing?.active ?? true);
-  const [alreadyPaid, setAlreadyPaid] = useState(true);
+  // null until the person touches the switch: until then it follows what the app can tell.
+  const [alreadyPaidChoice, setAlreadyPaidChoice] = useState<boolean | null>(null);
 
   const amount = amountText.trim() === '' ? null : parseAmountText(amountText);
   const amountInvalid = amountText.trim() !== '' && (amount === null || amount <= 0);
   const valid = amount !== null && amount > 0;
   // Only a payday that already went by this month needs the question: was it already paid?
   const askAlreadyPaid = !existing && dateInMonth(monthKeyOf(today), day) < today;
+  // If something of this type was already written down by hand this month, it is probably this very income:
+  // recording it again would count it twice, so the default is to start next month.
+  const loggedByHand = incomes.some((i) => !i.ruleId && i.sourceId === sourceId && i.date.startsWith(monthKeyOf(today)));
+  const alreadyPaid = alreadyPaidChoice ?? !loggedByHand;
 
   const save = () => {
     if (!valid || amount === null) return;
@@ -125,9 +130,11 @@ export function IncomeRuleSheet({ id, onClose }: { id: string | 'new'; onClose: 
           <div className="row row--plain">
             <div className="row__main">
               <div className="row__title">Ya me llegó este mes</div>
-              <div className="row__sub">{alreadyPaid ? 'Lo sumo a este mes ahora mismo.' : 'Empiezo a anotarlo el mes que viene.'}</div>
+              <div className="row__sub">
+                {alreadyPaid ? 'Lo sumo a este mes ahora mismo.' : loggedByHand && alreadyPaidChoice === null ? 'Ya anotaste uno este mes: empiezo el mes que viene.' : 'Empiezo a anotarlo el mes que viene.'}
+              </div>
             </div>
-            <button type="button" role="switch" aria-checked={alreadyPaid} aria-label="Ya me llegó este mes" className="switch" onClick={() => setAlreadyPaid((v) => !v)} />
+            <button type="button" role="switch" aria-checked={alreadyPaid} aria-label="Ya me llegó este mes" className="switch" onClick={() => setAlreadyPaidChoice(!alreadyPaid)} />
           </div>
         )}
 

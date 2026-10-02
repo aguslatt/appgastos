@@ -350,11 +350,11 @@ export function createStore(options: StoreOptions = {}) {
       return rule;
     },
 
-    /** `today` is only used when a paused rule is resumed (it defaults to the clock's day). */
+    /** `today` is only used when a paused rule is resumed (it defaults to the clock's day, as it does when it isn't a date). */
     updateRecurring(id: string, patch: Partial<Pick<Recurring, 'amount' | 'categoryId' | 'note' | 'day' | 'active'>>, today?: DateStr) {
       const amount = patch.amount === undefined ? undefined : positiveCents(patch.amount);
       if (amount === null) throw new Error('Invalid amount');
-      const resumeFrom = addMonths(monthKeyOf(today ?? todayStr(new Date(now()))), -1);
+      const resumeFrom = addMonths(monthKeyOf(today !== undefined && isValidDateStr(today) ? today : todayStr(new Date(now()))), -1);
       commit({
         ...data,
         recurring: data.recurring.map((r) =>
@@ -465,12 +465,12 @@ export function createStore(options: StoreOptions = {}) {
       return rule;
     },
 
-    /** `today` is only used when a paused rule is resumed (it defaults to the clock's day). */
+    /** `today` is only used when a paused rule is resumed (it defaults to the clock's day, as it does when it isn't a date). */
     updateIncomeRule(id: string, patch: Partial<Pick<IncomeRule, 'amount' | 'sourceId' | 'note' | 'day' | 'active'>>, today?: DateStr) {
       const amount = patch.amount === undefined ? undefined : positiveCents(patch.amount);
       if (amount === null) throw new Error('Invalid amount');
       if (!data.incomeRules.some((r) => r.id === id)) return;
-      const resumeFrom = addMonths(monthKeyOf(today ?? todayStr(new Date(now()))), -1);
+      const resumeFrom = addMonths(monthKeyOf(today !== undefined && isValidDateStr(today) ? today : todayStr(new Date(now()))), -1);
       commit({
         ...data,
         incomeRules: data.incomeRules.map((r) =>

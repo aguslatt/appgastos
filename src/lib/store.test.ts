@@ -1370,6 +1370,19 @@ describe('regressions', () => {
       expect(dates(store)).toEqual(['2026-12-10']);
     });
 
+    it('takes the clock\'s day when the one it is given is not a date', () => {
+      for (const junk of ['garbage', '2026-13-45', '2026-10', '']) {
+        let n = 0;
+        const store = createStore({ storage: null, makeId: () => `r-${++n}`, now: () => new Date(2026, 9, 12, 12).getTime() });
+        const r = store.addRecurring({ amount: 5000, categoryId: 'servicios', note: 'Luz', day: 10, startMonth: '2026-05' });
+        store.updateRecurring(r.id, { active: false });
+        expect(() => store.updateRecurring(r.id, { active: true }, junk)).not.toThrow();
+        expect(store.getData().recurring[0]).toMatchObject({ active: true, lastGenerated: '2026-09' });
+        store.runRecurring('2026-10-12');
+        expect(dates(store)).toEqual(['2026-10-10']);
+      }
+    });
+
     it('does nothing special to a rule that was not paused', () => {
       const { store } = setup();
       const r = store.addRecurring({ amount: 5000, categoryId: 'servicios', note: 'Luz', day: 10, startMonth: '2026-05' });

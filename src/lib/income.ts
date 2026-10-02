@@ -125,7 +125,7 @@ export interface ExpectedIncome {
   basis: IncomeBasis;
   /** What the active fixed incomes bring each month. */
   fixed: Cents;
-  /** What usually comes on top, from earlier months; null while there isn't a whole month to look at. */
+  /** What usually comes on top, from earlier months; null while there isn't a whole month to look at, 0 when those months were empty. */
   variable: Cents | null;
 }
 
@@ -178,9 +178,12 @@ export function expectedIncome(opts: {
     if (months.length > 0) variable = Math.round(months.reduce((acc, m) => acc + sumIncomes(byMonth.get(m) ?? []), 0) / months.length);
   }
 
-  if (fixed > 0 || variable !== null) {
-    const basis: IncomeBasis = fixed > 0 && variable !== null ? 'mixed' : fixed > 0 ? 'fixed' : 'history';
-    return { amount: fixed + (variable ?? 0), basis, fixed, variable };
+  // Months with nothing recorded at all say nothing about what is typical (the app may simply not have been
+  // used): they don't make an income of zero, so the rough figure, or nothing, takes over.
+  const onTop = variable !== null && variable > 0 ? variable : null;
+  if (fixed > 0 || onTop !== null) {
+    const basis: IncomeBasis = fixed > 0 && onTop !== null ? 'mixed' : fixed > 0 ? 'fixed' : 'history';
+    return { amount: fixed + (onTop ?? 0), basis, fixed, variable };
   }
   if (opts.estimate !== null && opts.estimate > 0) return { amount: opts.estimate, basis: 'estimate', fixed, variable };
   return { amount: null, basis: 'none', fixed, variable };
