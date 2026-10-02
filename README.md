@@ -75,6 +75,8 @@ El nombre "Cuánto" aparece en `index.html`, `public/manifest.webmanifest`, `src
 
 El flujo `.github/workflows/deploy.yml` construye y publica la app cada vez que se actualiza la rama `main`. Para activarlo una sola vez: en GitHub, **Settings → Pages → Source: GitHub Actions**. El link queda en `https://<usuario>.github.io/<repositorio>/`.
 
+También se puede publicar a mano, desde cualquier rama: pestaña **Actions → «Publicar en GitHub Pages» → Run workflow**. La app funciona igual desde un subdirectorio (así lo sirve GitHub Pages) y desde un dominio propio.
+
 ## Privacidad
 
 No hay servidores, cuentas ni analíticas. La app no hace pedidos de red salvo para descargarse a sí misma y, **solo si conectás tu clave y tocás *Buscar precios***, para consultar a Anthropic con lo que se detalla en la sección de la IA. El dictado por voz usa el reconocimiento del navegador, que según el equipo puede procesarse en los servidores de Google o Apple; el teclado del teléfono tiene su propio micrófono si preferís no usarlo.
