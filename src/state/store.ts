@@ -3,7 +3,7 @@ import { DATA_KEY, createStore, type StorageLike, type StoreStatus } from '../li
 import type { AppData } from '../lib/types';
 
 /** localStorage when the browser allows it (private modes and strict settings may not). */
-function browserStorage(): StorageLike | null {
+export function browserStorage(): StorageLike | null {
   try {
     const s = window.localStorage;
     const probe = '__mg_probe__';

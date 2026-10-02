@@ -1,5 +1,6 @@
 import { ChevronRight, Download, FileSpreadsheet, FolderPlus, Plus, Share, Smartphone, Sparkles, Trash2, Upload } from 'lucide-react';
 import { useRef, useState, type CSSProperties, type ReactNode } from 'react';
+import { AiSettings } from '../components/AiSettings';
 import { BudgetSheet } from '../components/BudgetSheet';
 import { IncomeSheet } from '../components/IncomeSheet';
 import { ImportSheet } from '../components/ImportSheet';
@@ -15,6 +16,7 @@ import { CURRENCIES, getMoneyFormatter } from '../lib/money';
 import { nextPayments } from '../lib/recurring';
 import type { AppData, ThemePref } from '../lib/types';
 import { useCategoryMap, useFmt, useToday } from '../state/derived';
+import { aiConfig } from '../state/ai';
 import { useInstall } from '../state/install';
 import { store, useData } from '../state/store';
 import { useUi } from '../state/ui';
@@ -119,12 +121,13 @@ export function SettingsScreen() {
   const wipe = async () => {
     const ok = await ui.confirm({
       title: '¿Borrar todo?',
-      text: 'Se eliminan gastos, carpetas y ajustes de este teléfono. No se puede deshacer. Si no hiciste una copia, se pierde.',
+      text: 'Se eliminan gastos, carpetas, ajustes y la clave de la IA de este teléfono. No se puede deshacer. Si no hiciste una copia, se pierde.',
       confirmLabel: 'Borrar todo',
       danger: true,
     });
     if (!ok) return;
     store.resetAll();
+    aiConfig.clear();
     ui.setTab('calc');
   };
 
@@ -295,6 +298,10 @@ export function SettingsScreen() {
         </Section>
       )}
 
+      <Section title="IA con búsqueda en internet" note="Opcional. Para las metas de viaje y de mudanza: busca precios de ahora y completa los datos por ti. La app funciona igual sin esto.">
+        <AiSettings />
+      </Section>
+
       <Section title="Tus datos" note="Todo se guarda solo en este teléfono, sin cuentas ni servidores. Haz una copia de vez en cuando, por si cambias de equipo.">
         <div className="list">
           <button type="button" className="row" onClick={exportJson}>
@@ -339,7 +346,7 @@ export function SettingsScreen() {
             <Trash2 size={20} aria-hidden="true" />
             <span className="row__main">
               <span className="row__title">Borrar todo</span>
-              <span className="row__sub">Gastos, carpetas y ajustes</span>
+              <span className="row__sub">Gastos, carpetas, ajustes y clave de IA</span>
             </span>
           </button>
         </div>

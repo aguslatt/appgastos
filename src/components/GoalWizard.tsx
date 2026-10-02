@@ -1,5 +1,7 @@
 import { Plane, Home, Target, Plus, X } from 'lucide-react';
 import { useMemo, useState, type ReactNode } from 'react';
+import type { MoveAnswer } from '../lib/ai';
+import { normalize } from '../lib/classifier';
 import { addMonths, monthKeyOf } from '../lib/dates';
 import { describeGoal } from '../lib/goalText';
 import { goalStatus, moveCosts, moveImpact, requiredPerMonth, totalRequired, type Goal, type GoalKind } from '../lib/goals';
@@ -12,8 +14,10 @@ import { useUi } from '../state/ui';
 import { AmountField, parseOptionalAmount } from './AmountField';
 import { GoalChip } from './GoalChip';
 import { MonthPicker } from './MonthPicker';
+import { MoveAi } from './MoveAi';
 import { Sheet } from './Sheet';
 import { Stepper } from './Stepper';
+import { TripAi, type TripPrices } from './TripAi';
 import { cx } from './cx';
 
 const SAVING_EMOJIS = ['🎯', '🏖️', '🚗', '💍', '🎓', '💻', '🎁', '🐶', '💰', '🛠️'];
@@ -21,6 +25,8 @@ const SAVING_EMOJIS = ['🎯', '🏖️', '🚗', '💍', '🎓', '💻', '🎁'
 interface Stop {
   place: string;
   days: number;
+  /** US dollars per person per day, found by the AI search for this place. */
+  dailyUsd?: number;
 }
 
 /** Create or edit a goal: a trip (with a cost estimate), a move, or any amount to save. */
@@ -52,6 +58,7 @@ export function GoalWizard({ goalId, onClose }: { goalId: string | 'new'; onClos
   const [flightText, setFlightText] = useState(toText(existing?.trip?.flightEach));
   const [extrasText, setExtrasText] = useState(toText(existing?.trip?.extras));
   const [focusedStop, setFocusedStop] = useState<number | null>(null);
+  const [hopUsd, setHopUsd] = useState<number | null>(existing?.trip?.hopUsd ?? null);
 
   // move
   const move = existing?.move;
@@ -80,10 +87,11 @@ export function GoalWizard({ goalId, onClose }: { goalId: string | 'new'; onClos
 
   const usedStops = stops.filter((s) => s.place.trim() && s.days > 0);
   const tripEstimate = useMemo(
-    () => (kind === 'trip' && fx !== null && usedStops.length > 0 ? estimateTrip({ stops: usedStops, people, style, fxRate: fx, flightEach: flight.value, extras: extras.value ?? 0 }) : null),
+    () => (kind === 'trip' && fx !== null && usedStops.length > 0 ? estimateTrip({ stops: usedStops, people, style, fxRate: fx, flightEach: flight.value, hopUsd, extras: extras.value ?? 0 }) : null),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [kind, fx, JSON.stringify(usedStops), people, style, flight.value, extras.value],
+    [kind, fx, JSON.stringify(usedStops), people, style, flight.value, hopUsd, extras.value],
   );
+  const aiPrices = hopUsd !== null || usedStops.some((s) => s.dailyUsd !== undefined);
   const movePlan = kind === 'move' && rent.value ? { zone: zone.trim(), rent: rent.value, monthlyExtras: fees.value ?? 0, depositMonths: depositM, commissionMonths: commissionM, advanceMonths: advanceM, setup: setup.value ?? 0, currentMonthly: current.value ?? 0 } : null;
   const costs = movePlan ? moveCosts(movePlan) : null;
 
@@ -102,7 +110,7 @@ export function GoalWizard({ goalId, onClose }: { goalId: string | 'new'; onClos
   const save = () => {
     if (!draft || !kind || goalTarget === null) return;
     const common = { name: displayName, emoji: kind === 'trip' ? '✈️' : kind === 'move' ? '🏠' : emoji, target: goalTarget, deadline, saved: saved.value ?? 0 };
-    const trip = kind === 'trip' && fx !== null ? { stops: usedStops, people, style, fx, ...(flight.value && { flightEach: flight.value }), ...(extras.value && { extras: extras.value }) } : undefined;
+    const trip = kind === 'trip' && fx !== null ? { stops: usedStops, people, style, fx, ...(flight.value && { flightEach: flight.value }), ...(hopUsd !== null && { hopUsd }), ...(extras.value && { extras: extras.value }) } : undefined;
     if (kind === 'trip' && fx !== null && settings.currency !== 'USD' && settings.fxRate !== fx) store.updateSettings({ fxRate: fx });
     if (existing) store.updateGoal(existing.id, { ...common, kind, trip, move: movePlan ?? undefined });
     else store.addGoal({ kind, ...common, ...(trip && { trip }), ...(movePlan && { move: movePlan }) });
@@ -111,7 +119,39 @@ export function GoalWizard({ goalId, onClose }: { goalId: string | 'new'; onClos
     onClose();
   };
 
-  const setStop = (i: number, patch: Partial<Stop>) => setStops((list) => list.map((s, j) => (j === i ? { ...s, ...patch } : s)));
+  // A price found for a place no longer applies once the place is another one.
+  const setStop = (i: number, patch: Partial<Stop>) =>
+    setStops((list) => list.map((s, j) => (j === i ? { ...s, ...patch, ...(patch.place !== undefined && patch.place !== s.place && { dailyUsd: undefined }) } : s)));
+
+  const clearAiPrices = () => {
+    setStops((list) => list.map((s) => ({ place: s.place, days: s.days })));
+    setHopUsd(null);
+  };
+
+  // Daily prices were asked for one style: another style needs a new search, or the table.
+  const changeStyle = (next: TripStyle) => {
+    if (next !== style) clearAiPrices();
+    setStyle(next);
+  };
+
+  const applyTripPrices = ({ flightUsd, hopUsd: hop, prices }: TripPrices) => {
+    if (fx !== null) setFlightText(toText(Math.round(flightUsd * fx) * 100));
+    setHopUsd(hop);
+    setStops((list) =>
+      list.map((s) => {
+        const found = prices.find((p) => normalize(p.place) === normalize(s.place));
+        return found ? { ...s, dailyUsd: found.dailyUsd } : s;
+      }),
+    );
+  };
+
+  const applyMove = (answer: MoveAnswer) => {
+    setRentText(toText(answer.rent));
+    if (answer.monthlyExtras > 0) setFeesText(toText(answer.monthlyExtras));
+    setDepositM(answer.depositMonths);
+    setCommissionM(answer.commissionMonths);
+    setAdvanceM(answer.advanceMonths);
+  };
 
   const picker = (
     <div className="stack">
@@ -199,7 +239,7 @@ export function GoalWizard({ goalId, onClose }: { goalId: string | 'new'; onClos
         <span className="field__label">Estilo de viaje</span>
         <div className="segmented" role="group" aria-label="Estilo de viaje">
           {(Object.keys(STYLE_LABELS) as TripStyle[]).map((s) => (
-            <button key={s} type="button" className="segmented__item" aria-pressed={style === s} onClick={() => setStyle(s)}>
+            <button key={s} type="button" className="segmented__item" aria-pressed={style === s} onClick={() => changeStyle(s)}>
               {STYLE_LABELS[s]}
             </button>
           ))}
@@ -219,6 +259,8 @@ export function GoalWizard({ goalId, onClose }: { goalId: string | 'new'; onClos
 
       {when}
 
+      <TripAi stops={usedStops} people={people} style={style} month={deadline} fx={fx} onApply={applyTripPrices} />
+
       <details className="fine">
         <summary>Ajustes finos (pasaje real, compras)</summary>
         <div className="stack" style={{ marginTop: 12 }}>
@@ -237,6 +279,7 @@ export function GoalWizard({ goalId, onClose }: { goalId: string | 'new'; onClos
         <span className="field__label">Zona o barrio</span>
         <input className="input" placeholder="Ej: Palermo, Nueva Córdoba…" value={zone} maxLength={40} onChange={(e) => setZone(e.target.value)} />
       </label>
+      <MoveAi zone={zone} onApply={applyMove} />
       <AmountField label="Alquiler por mes" text={rentText} onText={setRentText} invalid={rent.invalid} placeholder="Mira avisos de la zona" hint="Un valor típico de avisos de esa zona; luego lo ajustas." />
       <AmountField label="Expensas y servicios por mes" text={feesText} onText={setFeesText} invalid={fees.invalid} placeholder="0" />
       <AmountField label="Lo que pagas hoy por vivir (alquiler + gastos)" text={currentText} onText={setCurrentText} invalid={current.invalid} placeholder="0" hint="Sirve para ver cuánto cambia tu mes." />
@@ -301,7 +344,13 @@ export function GoalWizard({ goalId, onClose }: { goalId: string | 'new'; onClos
         <p className="estimate__note">
           Estimación de referencia con precios aproximados de 2026 en dólares. Varía mucho según la fecha: ajusta el pasaje y los extras con valores reales.
           {tripEstimate.unknown.length > 0 && ` No tengo datos de ${tripEstimate.unknown.join(', ')}: usé un promedio.`}
+          {aiPrices && ' Incluye precios de ahora que buscó la IA.'}
         </p>
+        {aiPrices && (
+          <button type="button" className="btn btn--ghost btn--small" style={{ marginTop: 10 }} onClick={clearAiPrices}>
+            Volver a los valores de referencia
+          </button>
+        )}
       </div>
     ) : kind === 'move' && costs ? (
       <div className="estimate">

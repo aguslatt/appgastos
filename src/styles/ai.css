@@ -1,0 +1,277 @@
+/* ---- optional AI search (goal wizard and settings) ------------------------------------------------ */
+
+.ai {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 16px;
+  border-radius: var(--r-l);
+  background: var(--card);
+  box-shadow: var(--shadow-1), inset 0 0 0 1.5px color-mix(in srgb, var(--mark) 28%, transparent);
+}
+
+.ai__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--ink);
+}
+
+.ai__head svg {
+  flex: none;
+  color: var(--mark);
+}
+
+.ai__head b {
+  flex: 1;
+  min-width: 0;
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.ai__lead {
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.ai__privacy {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0;
+  color: var(--muted);
+  font-size: 12.5px;
+  line-height: 1.4;
+}
+
+.ai__privacy svg {
+  flex: none;
+  margin-top: 1px;
+  color: var(--mark);
+}
+
+.ai__error {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: var(--r-m);
+  background: var(--bad-soft);
+  color: var(--ink);
+  font-size: 14px;
+  line-height: 1.35;
+}
+
+.ai__error svg {
+  flex: none;
+  margin-top: 1px;
+  color: var(--bad);
+}
+
+.ai__run {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border-radius: var(--r-m);
+  background: var(--card-2);
+}
+
+.ai__run > svg {
+  flex: none;
+  color: var(--mark);
+}
+
+.ai__run-text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.ai__run-text b {
+  font-size: 15px;
+}
+
+.ai__run-text span {
+  color: var(--muted);
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.ai__spin {
+  animation: ai-spin 0.9s linear infinite;
+}
+
+@keyframes ai-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.ai__choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.ai__choice {
+  min-height: 40px;
+  padding: 0 14px;
+  border-radius: 999px;
+  background: var(--card-2);
+  color: var(--ink-2);
+  font-size: 14px;
+  font-weight: 700;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.ai__choice.is-on {
+  background: var(--ink);
+  color: var(--bg);
+}
+
+.ai__result {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.ai__for {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 800;
+  overflow-wrap: anywhere;
+}
+
+.ai__result-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 10px;
+}
+
+.ai__result-head > span:last-child {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.ai__result .estimate--plain li {
+  flex-wrap: wrap;
+}
+
+.ai__result .estimate--plain li > :last-child {
+  text-align: right;
+}
+
+.ai__result .estimate--plain li.ai__entry {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+}
+
+.ai__result .estimate--plain li.ai__entry > :last-child {
+  color: var(--ink-2);
+  text-align: left;
+}
+
+.ai__local {
+  color: var(--muted);
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.ai__notes {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.ai__sources {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.ai__sources ul {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ai__sources a {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 36px;
+  color: var(--ink);
+  font-size: 13.5px;
+  font-weight: 600;
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, var(--ink) 35%, transparent);
+  text-underline-offset: 3px;
+}
+
+.ai__sources a span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ai__sources a svg {
+  flex: none;
+  color: var(--muted);
+}
+
+.ai__actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ai__actions--row {
+  flex-direction: row;
+  flex-wrap: wrap;
+}
+
+.ai__status {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.ai__status > svg {
+  flex: none;
+  color: var(--mark);
+}
+
+.ai__status > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ai__status span {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.field__hint a {
+  color: var(--ink);
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.field__hint a svg {
+  display: inline;
+  vertical-align: -1px;
+}

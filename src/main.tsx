@@ -7,6 +7,7 @@ import './styles/history.css';
 import './styles/settings.css';
 import './styles/story.css';
 import './styles/goals.css';
+import './styles/ai.css';
 import { createRoot } from 'react-dom/client';
 import App from './App';
 
