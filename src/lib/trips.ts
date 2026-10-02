@@ -1,5 +1,5 @@
 import { normalize } from './classifier';
-import type { Cents } from './types';
+import type { Cents, TripPlan } from './types';
 
 /*
  * Rough reference costs to get a first number for a trip. They are ballpark figures in
@@ -180,4 +180,18 @@ export function estimateTrip(input: TripEstimateInput): TripEstimate {
     { id: 'buffer', label: 'Margen para imprevistos', amount: buffer },
   ];
   return { lines, total: subtotal + buffer, unknown, days };
+}
+
+/** The estimate of a trip as it was saved, with every price the plan carries. Null when it was saved without an exchange rate. */
+export function planEstimate(plan: TripPlan): TripEstimate | null {
+  if (!plan.fx || plan.fx <= 0) return null;
+  return estimateTrip({
+    stops: plan.stops,
+    people: plan.people,
+    style: plan.style,
+    fxRate: plan.fx,
+    flightEach: plan.flightEach ?? null,
+    hopUsd: plan.hopUsd ?? null,
+    extras: plan.extras ?? 0,
+  });
 }

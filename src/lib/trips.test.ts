@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { PLACES, estimateTrip, findPlace, searchPlaces } from './trips';
+import { PLACES, estimateTrip, findPlace, planEstimate, searchPlaces } from './trips';
+import type { TripPlan } from './types';
 
 describe('places', () => {
   it('has sane, ordered prices for every place', () => {
@@ -130,5 +131,42 @@ describe('estimateTrip', () => {
       const e = estimateTrip({ ...base, fxRate: 1, hopUsd: null, stops: [{ place: 'Madrid', days: 3 }, { place: 'Roma', days: 3 }] });
       expect(e.lines.find((l) => l.id === 'hops')?.amount).toBe(60 * 100);
     });
+  });
+});
+
+describe('planEstimate', () => {
+  const plan: TripPlan = {
+    stops: [{ place: 'Madrid', days: 7, dailyUsd: 140 }, { place: 'Islandia', days: 3 }, { place: 'Roma', days: 0 }],
+    people: 2,
+    style: 'comfort',
+    fx: 1400,
+    flightEach: 1_800_000_00,
+    hopUsd: 80,
+    extras: 200_000_00,
+  };
+
+  it('is the estimate of the saved plan, with every price it carries', () => {
+    expect(planEstimate(plan)).toEqual(estimateTrip({ stops: plan.stops, people: 2, style: 'comfort', fxRate: 1400, flightEach: 1_800_000_00, hopUsd: 80, extras: 200_000_00 }));
+  });
+
+  it('counts the transfer price the plan carries (the detail screen once left it out)', () => {
+    const withHop = planEstimate(plan)!;
+    const withoutHop = planEstimate({ ...plan, hopUsd: undefined })!;
+    // two stops with days: one transfer, for two people
+    expect(withHop.lines.find((l) => l.id === 'hops')?.amount).toBe(80 * 2 * 1400 * 100);
+    expect(withoutHop.lines.find((l) => l.id === 'hops')?.amount).not.toBe(80 * 2 * 1400 * 100);
+  });
+
+  it('counts the daily prices the plan carries, and the flight and extras', () => {
+    const e = planEstimate(plan)!;
+    expect(e.lines.find((l) => l.id === 'flights')?.amount).toBe(2 * 1_800_000_00);
+    expect(e.lines.find((l) => l.id === 'extras')?.amount).toBe(200_000_00);
+    expect(e.unknown).toEqual(['Islandia']);
+    expect(e.days).toBe(10);
+  });
+
+  it('has nothing to say about a trip saved without an exchange rate', () => {
+    expect(planEstimate({ ...plan, fx: undefined })).toBeNull();
+    expect(planEstimate({ ...plan, fx: 0 })).toBeNull();
   });
 });

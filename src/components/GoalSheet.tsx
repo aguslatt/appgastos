@@ -4,7 +4,7 @@ import { colorVar } from '../lib/categories';
 import { formatMonthLabel, monthName } from '../lib/dates';
 import { describeGoal } from '../lib/goalText';
 import { extendOptions, goalStatus, moveCosts, moveImpact, monthsLeft, progress, requiredPerMonth, suggestCuts, totalRequired } from '../lib/goals';
-import { estimateTrip } from '../lib/trips';
+import { planEstimate } from '../lib/trips';
 import { useCategoryMap, useFmt, useToday } from '../state/derived';
 import { useCapacity } from '../state/goals';
 import { store, useData } from '../state/store';
@@ -43,7 +43,7 @@ export function GoalSheet({ id, onClose, onEdit }: { id: string; onClose: () => 
   const perMonth = requiredPerMonth(goal, today);
   const left = monthsLeft(goal.deadline, today);
 
-  const tripLines = goal.kind === 'trip' && goal.trip?.fx ? estimateTrip({ stops: goal.trip.stops, people: goal.trip.people, style: goal.trip.style, fxRate: goal.trip.fx, flightEach: goal.trip.flightEach ?? null, extras: goal.trip.extras ?? 0 }).lines : null;
+  const tripLines = goal.kind === 'trip' && goal.trip ? (planEstimate(goal.trip)?.lines ?? null) : null;
   const costs = goal.kind === 'move' && goal.move ? moveCosts(goal.move) : null;
   const impact = goal.kind === 'move' && goal.move ? moveImpact(goal.move, capacity, perMonth) : null;
 
