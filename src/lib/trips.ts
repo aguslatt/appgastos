@@ -90,14 +90,23 @@ export function findPlace(name: string): Place | undefined {
   return PLACES.find((place) => [place.name, ...(place.aliases ?? [])].some((n) => normalize(n) === q));
 }
 
+export interface TripStopInput {
+  place: string;
+  days: number;
+  /** USD per person per day found by a live price search; replaces the reference table for this stop. */
+  dailyUsd?: number;
+}
+
 export interface TripEstimateInput {
-  stops: ReadonlyArray<{ place: string; days: number }>;
+  stops: ReadonlyArray<TripStopInput>;
   people: number;
   style: TripStyle;
   /** USD to local currency; use 1 when the app currency is USD. */
   fxRate: number;
   /** Overrides the reference flight price (local currency, per person). */
   flightEach?: Cents | null;
+  /** Overrides the reference cost of each transfer between stops (USD per person). */
+  hopUsd?: number | null;
   /** Shopping, gifts, anything else (local currency). */
   extras?: Cents;
   /** Margin for the unexpected, 0..1. */
@@ -135,8 +144,11 @@ export function estimateTrip(input: TripEstimateInput): TripEstimate {
     if (d === 0) continue;
     days += d;
     const place = findPlace(stop.place);
-    if (place) {
-      regions.push(place.region);
+    if (place) regions.push(place.region);
+    if (stop.dailyUsd !== undefined && stop.dailyUsd > 0) {
+      // A price found for this very stop beats the table, and means the place is not "unknown".
+      stayUsd += stop.dailyUsd * d * people;
+    } else if (place) {
       stayUsd += (place.daily[idx] ?? 0) * d * people;
     } else {
       // Unknown place: average of everything we know, so the number is at least in the right range.
@@ -152,7 +164,8 @@ export function estimateTrip(input: TripEstimateInput): TripEstimate {
 
   const stops = input.stops.filter((s) => s.days > 0);
   const hopRegion = regions[0];
-  const hops = Math.round(Math.max(0, stops.length - 1) * (hopRegion ? HOP_USD[hopRegion] : 100) * people * fx * 100);
+  const hopUsd = input.hopUsd != null && input.hopUsd >= 0 ? input.hopUsd : hopRegion ? HOP_USD[hopRegion] : 100;
+  const hops = Math.round(Math.max(0, stops.length - 1) * hopUsd * people * fx * 100);
 
   const stay = Math.round(stayUsd * fx * 100);
   const extras = input.extras ?? 0;

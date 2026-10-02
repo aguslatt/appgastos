@@ -469,7 +469,7 @@ describe('parseAmountText', () => {
       expect(bad).toEqual([]);
     });
 
-    // Every locale the app can detect, except Paraguay (see the known defects below).
+    // Every locale the app can detect, except Paraguay (its symbol ends in a dot: see the regressions below).
     const ROUND_TRIP_LOCALES: Array<[string, string]> = [
       ['es-AR', 'ARS'], ['es-ES', 'EUR'], ['es-MX', 'MXN'], ['es-CL', 'CLP'], ['es-CO', 'COP'], ['es-UY', 'UYU'],
       ['es-PE', 'PEN'], ['es-BO', 'BOB'], ['es-BR', 'BRL'], ['es-US', 'USD'], ['es-EC', 'USD'], ['es-PA', 'USD'],
@@ -499,10 +499,10 @@ describe('parseAmountText', () => {
   });
 });
 
-// ---- known defects ----------------------------------------------------------
+// ---- regressions: bugs found in review, since fixed --------------------------
 
-describe('known defects', () => {
-  describe('parseAmountText turns a trailing separator after the decimals into a 100x amount', () => {
+describe('regressions', () => {
+  describe('a trailing separator after the decimals is not read as thousands grouping (it was 100x too much)', () => {
     // Either the intended value or null is acceptable; 100x too much is not.
     it.each([
       ['12,50,', 1250],
@@ -516,9 +516,9 @@ describe('known defects', () => {
     });
   });
 
-  describe('parseAmountText reads the dot of a currency abbreviation as a decimal mark', () => {
+  describe('the dot of a currency abbreviation is not a decimal mark', () => {
     // "Gs.", "Bs.", "S/.", "Q." are how these currencies are written; amounts of one or two digits
-    // come out 100x too small, and four or more digits come out as null.
+    // used to come out 100x too small, and four or more digits as null.
     it.each([
       ['Gs. 5', 500],
       ['Gs. 12', 1200],
@@ -541,7 +541,7 @@ describe('known defects', () => {
     });
   });
 
-  describe('negative zero is printed as "-$ 0" / "-0"', () => {
+  describe('amounts that round to zero print as a plain zero (not "-$ 0" / "-0")', () => {
     // Amounts such as a budget overrun of a few cents round to zero but keep Intl's minus sign.
     const f = getMoneyFormatter('es-AR', 'ARS');
 
@@ -554,7 +554,7 @@ describe('known defects', () => {
     });
   });
 
-  it('detectLocaleAndCurrency reads a script subtag as the region ("es-Latn-MX" should be Mexico)', () => {
+  it('detectLocaleAndCurrency skips a script subtag to find the region ("es-Latn-MX" is Mexico)', () => {
     expect(detectLocaleAndCurrency('es-Latn-MX')).toEqual({ locale: 'es-MX', currency: 'MXN' });
   });
 });

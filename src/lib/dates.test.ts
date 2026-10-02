@@ -867,13 +867,13 @@ describe.skipIf(!ZONE_SWITCHING_WORKS).each(ZONES)('in the %s time zone', (zone)
   });
 });
 
-// ---- known defects ----------------------------------------------------------
+// ---- regressions: bugs found in review, since fixed --------------------------
 
-describe('known defects', () => {
-  // isValidDateStr accepts '0000'-'0099' (four digits), but Date.UTC silently reads years 0-99 as
-  // 1900-1999, so the Date-based math answers about a different century. Typing "0026" into a
-  // date field is enough to get such a date.
-  describe('years 0000-0099 are valid dates but the day math moves them to 19xx', () => {
+describe('regressions', () => {
+  // Years 0000-0099 pass isValidDateStr, but Date.UTC reads years 0-99 as 1900-1999, so the day
+  // math used to answer about another century (typing "0026" into a date field is enough to get
+  // such a date).
+  describe('years 0000-0099 keep their own century in the day math', () => {
     it('addDays keeps the year', () => {
       expect(isValidDateStr('0050-01-01')).toBe(true);
       expect(addDays('0050-01-01', 1)).toBe('0050-01-02');
@@ -895,8 +895,8 @@ describe('known defects', () => {
     });
   });
 
-  // `dateInMonth` documents that it clamps the day, yet NaN slips through as the text "NaN".
-  // Reachable because the store does not validate a recurring rule's day.
+  // `dateInMonth` documents that it clamps the day, yet NaN used to slip through as the text "NaN"
+  // (reachable through an unvalidated recurring day).
   it('dateInMonth never returns an invalid date, even for a NaN day', () => {
     expect(isValidDateStr(dateInMonth('2026-10', Number.NaN))).toBe(true);
   });

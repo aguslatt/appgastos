@@ -30,17 +30,18 @@ function truncate(value: string, max: number): string {
   return parts.slice(0, max).join('');
 }
 
-const text = (v: unknown, max: number): string => (typeof v === 'string' ? truncate(v.trim(), max).trim() : '');
-const positiveCents = (v: unknown): number | null => {
+export const cleanText = (v: unknown, max: number): string => (typeof v === 'string' ? truncate(v.trim(), max).trim() : '');
+const text = cleanText;
+export const positiveCents = (v: unknown): number | null => {
   if (typeof v !== 'number' || !Number.isFinite(v)) return null;
   const n = Math.round(v);
   return Number.isSafeInteger(n) && n > 0 ? n : null;
 };
-const THEMES: readonly ThemePref[] = ['system', 'light', 'dark'];
-const GOAL_KINDS: readonly GoalKind[] = ['trip', 'move', 'saving'];
+export const THEMES: readonly ThemePref[] = ['system', 'light', 'dark'];
+export const GOAL_KINDS: readonly GoalKind[] = ['trip', 'move', 'saving'];
 const TRIP_STYLES = ['budget', 'mid', 'comfort'] as const;
 
-const nonNegativeCents = (v: unknown): number => {
+export const nonNegativeCents = (v: unknown): number => {
   if (typeof v !== 'number' || !Number.isFinite(v)) return 0;
   const n = Math.round(v);
   return Number.isSafeInteger(n) && n > 0 ? n : 0;
@@ -48,12 +49,30 @@ const nonNegativeCents = (v: unknown): number => {
 const boundedInt = (v: unknown, min: number, max: number, fallback: number): number =>
   typeof v === 'number' && Number.isFinite(v) ? Math.min(max, Math.max(min, Math.round(v))) : fallback;
 
-function normalizeTrip(raw: unknown): TripPlan | undefined {
+/** A day of the month for a fixed payment: whole, between 1 and 31, and 1 for anything that isn't a number. */
+export const clampDay = (v: unknown): number => {
+  const day = typeof v === 'number' ? Math.min(31, Math.max(1, Math.trunc(v))) : 1;
+  return Number.isFinite(day) ? day : 1;
+};
+
+/** Whole US dollars between 1 and 20,000, or null: the shape of a price per person that can be believed. */
+const usdAmount = (v: unknown): number | null => {
+  if (typeof v !== 'number' || !Number.isFinite(v)) return null;
+  const n = Math.round(v);
+  return n >= 1 && n <= 20_000 ? n : null;
+};
+
+export function normalizeTrip(raw: unknown): TripPlan | undefined {
   if (!isRecord(raw)) return undefined;
   const stops = (Array.isArray(raw.stops) ? raw.stops : [])
     .filter(isRecord)
     .slice(0, 20)
-    .map((s) => ({ place: text(s.place, 60), days: boundedInt(s.days, 0, 365, 0) }));
+    .map((s) => {
+      const stop: TripPlan['stops'][number] = { place: text(s.place, 60), days: boundedInt(s.days, 0, 365, 0) };
+      const dailyUsd = usdAmount(s.dailyUsd);
+      if (dailyUsd !== null) stop.dailyUsd = dailyUsd;
+      return stop;
+    });
   const plan: TripPlan = {
     stops,
     people: boundedInt(raw.people, 1, 20, 1),
@@ -62,12 +81,14 @@ function normalizeTrip(raw: unknown): TripPlan | undefined {
   if (typeof raw.fx === 'number' && Number.isFinite(raw.fx) && raw.fx > 0) plan.fx = raw.fx;
   const flightEach = nonNegativeCents(raw.flightEach);
   if (flightEach > 0) plan.flightEach = flightEach;
+  const hopUsd = usdAmount(raw.hopUsd);
+  if (hopUsd !== null) plan.hopUsd = hopUsd;
   const extras = nonNegativeCents(raw.extras);
   if (extras > 0) plan.extras = extras;
   return plan;
 }
 
-function normalizeMove(raw: unknown): MovePlan | undefined {
+export function normalizeMove(raw: unknown): MovePlan | undefined {
   if (!isRecord(raw)) return undefined;
   return {
     zone: text(raw.zone, 60),
@@ -81,7 +102,7 @@ function normalizeMove(raw: unknown): MovePlan | undefined {
   };
 }
 
-function isUsableLocale(v: unknown): v is string {
+export function isUsableLocale(v: unknown): v is string {
   if (typeof v !== 'string' || !/^[a-z]{2,3}(-[A-Za-z0-9]{2,8})*$/.test(v)) return false;
   try {
     new Intl.NumberFormat(v);
@@ -191,13 +212,12 @@ export function normalizeData(
     let id = text(item.id, 60);
     if (!id || recurringIds.has(id)) id = freshId(recurringIds, reservedRecurringIds);
     recurringIds.add(id);
-    const day = typeof item.day === 'number' ? Math.min(31, Math.max(1, Math.trunc(item.day))) : 1;
     recurring.push({
       id,
       amount,
       categoryId: resolveCategory(item.categoryId),
       note: text(item.note, MAX_NOTE_LENGTH),
-      day: Number.isFinite(day) ? day : 1,
+      day: clampDay(item.day),
       startMonth: isValidMonthKey(item.startMonth) ? item.startMonth : monthKeyOf(today),
       lastGenerated: isValidMonthKey(item.lastGenerated) ? item.lastGenerated : null,
       active: item.active !== false,

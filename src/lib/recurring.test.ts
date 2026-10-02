@@ -644,12 +644,12 @@ describe('nextPayments', () => {
   });
 });
 
-// ---- known defects ----------------------------------------------------------
+// ---- regressions: bugs found in review, since fixed --------------------------
 
-describe('known defects', () => {
-  // `addMonths('9999-12', 1)` is '10000-01', which sorts BEFORE every four-digit month as text, so
-  // planRecurring thinks the rule is behind startMonth and starts over from it. A valid-looking
-  // lastGenerated in the far future therefore re-creates old expenses.
+describe('regressions', () => {
+  // `addMonths('9999-12', 1)` is '10000-01', which sorts before every four-digit month as text; a
+  // valid-looking lastGenerated in the far future used to make planRecurring start over from
+  // startMonth and re-create old expenses.
   it('a rule whose lastGenerated is far in the future does not regenerate old months', () => {
     const plan = planRecurring([rule({ lastGenerated: '9999-12', startMonth: '2020-01', day: 1 })], '2026-10-02');
     expect(dates(plan.drafts)).toEqual([]);

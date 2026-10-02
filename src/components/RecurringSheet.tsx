@@ -34,7 +34,7 @@ export function RecurringSheet({ id, onClose }: { id: string | 'new'; onClose: (
   const save = () => {
     if (!valid || amount === null || folderId === null) return;
     if (existing) {
-      store.updateRecurring(existing.id, { amount, categoryId: folderId, note, day, active });
+      store.updateRecurring(existing.id, { amount, categoryId: folderId, note, day, active }, today);
       ui.toast({ text: 'Pago fijo actualizado' });
     } else {
       store.addRecurring({ amount, categoryId: folderId, note, day, startMonth: firstMonthFor(day, today) });

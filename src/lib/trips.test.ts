@@ -86,4 +86,49 @@ describe('estimateTrip', () => {
     const e = estimateTrip({ ...base, fxRate: 1, stops: [{ place: 'Madrid', days: 10 }] });
     expect(e.total).toBe((1200 + 1100) * 100);
   });
+
+  describe('prices found for the trip itself', () => {
+    it('uses a daily price found for a stop instead of the table', () => {
+      const e = estimateTrip({ ...base, fxRate: 1, stops: [{ place: 'Madrid', days: 5, dailyUsd: 200 }] });
+      expect(e.lines.find((l) => l.id === 'stay')?.amount).toBe(5 * 200 * 100);
+    });
+
+    it('prices a place that is not in the table with its own daily price, and no longer calls it unknown', () => {
+      const e = estimateTrip({ ...base, fxRate: 1, stops: [{ place: 'Islandia', days: 4, dailyUsd: 250 }] });
+      expect(e.unknown).toEqual([]);
+      expect(e.lines.find((l) => l.id === 'stay')?.amount).toBe(4 * 250 * 100);
+    });
+
+    it('still reports the stops that have no price of their own', () => {
+      const e = estimateTrip({ ...base, fxRate: 1, stops: [{ place: 'Islandia', days: 4, dailyUsd: 250 }, { place: 'Narnia', days: 2 }] });
+      expect(e.unknown).toEqual(['Narnia']);
+    });
+
+    it('scales a daily price with people, days and the exchange rate', () => {
+      const e = estimateTrip({ ...base, people: 2, fxRate: 1000, stops: [{ place: 'Lisboa', days: 3, dailyUsd: 90 }] });
+      expect(e.lines.find((l) => l.id === 'stay')?.amount).toBe(90 * 3 * 2 * 1000 * 100);
+    });
+
+    it('ignores a daily price that is not a positive number', () => {
+      const withBad = estimateTrip({ ...base, fxRate: 1, stops: [{ place: 'Madrid', days: 5, dailyUsd: 0 }] });
+      const plain = estimateTrip({ ...base, fxRate: 1, stops: [{ place: 'Madrid', days: 5 }] });
+      expect(withBad.total).toBe(plain.total);
+    });
+
+    it('uses the price of a transfer between stops instead of the table', () => {
+      const e = estimateTrip({ ...base, fxRate: 1, people: 2, hopUsd: 100, stops: [{ place: 'Madrid', days: 3 }, { place: 'Roma', days: 3 }, { place: 'Paris', days: 3 }] });
+      // 2 transfers x 100 USD x 2 people
+      expect(e.lines.find((l) => l.id === 'hops')?.amount).toBe(2 * 100 * 2 * 100);
+    });
+
+    it('lets a transfer price of zero mean the transfers are free', () => {
+      const e = estimateTrip({ ...base, fxRate: 1, hopUsd: 0, stops: [{ place: 'Madrid', days: 3 }, { place: 'Roma', days: 3 }] });
+      expect(e.lines.some((l) => l.id === 'hops')).toBe(false);
+    });
+
+    it('falls back to the table when no transfer price is given', () => {
+      const e = estimateTrip({ ...base, fxRate: 1, hopUsd: null, stops: [{ place: 'Madrid', days: 3 }, { place: 'Roma', days: 3 }] });
+      expect(e.lines.find((l) => l.id === 'hops')?.amount).toBe(60 * 100);
+    });
+  });
 });

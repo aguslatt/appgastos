@@ -786,14 +786,13 @@ describe('expensesToCsv', () => {
   });
 });
 
-// ---- known defects ----------------------------------------------------------
+// ---- regressions: bugs found in review, since fixed --------------------------
 
-describe('known defects', () => {
-  // normalizeData only looks for an `expenses`, `settings` or `categories` key, and parseBackup
-  // never checks the `app` marker that serializeBackup writes. Any JSON file with one of those keys
-  // becomes a blank "backup" that "Reemplazar todo" would restore over the user's real data
-  // (the confirmation dialog does show "0 gastos").
-  describe('parseBackup accepts files that are plainly not this app\'s backups', () => {
+describe('regressions', () => {
+  // normalizeData is deliberately lenient (it also loads saved state); the strict "is this really our
+  // backup" rule lives in parseBackup. Any JSON with an `expenses`, `settings` or `categories` key used
+  // to become a blank "backup" that "Reemplazar todo" would restore over the user's real data.
+  describe('parseBackup refuses files that are plainly not this app\'s backups', () => {
     it.each([
       ['another app\'s export (different app marker)', JSON.stringify({ app: 'otra-app', expenses: [{ id: '1', amount: 100, date: '2026-10-01' }] })],
       ['a JSON with a category list of its own kind', JSON.stringify({ categories: [{ title: 'Food', total: 12 }], transactions: [{ value: 5 }] })],

@@ -55,13 +55,20 @@ export interface Recurring {
 export type GoalKind = 'trip' | 'move' | 'saving';
 
 export interface TripPlan {
-  stops: Array<{ place: string; days: number }>;
+  stops: Array<{
+    place: string;
+    days: number;
+    /** US dollars per person per day, when it came from a live price search (overrides the reference table). */
+    dailyUsd?: number;
+  }>;
   people: number;
   style: 'budget' | 'mid' | 'comfort';
   /** Units of the app currency per US dollar used for the estimate. */
   fx?: number;
   /** Real flight price per person, when known (overrides the reference). */
   flightEach?: Cents;
+  /** US dollars per person for each transfer between stops, when known (overrides the reference). */
+  hopUsd?: number;
   extras?: Cents;
 }
 

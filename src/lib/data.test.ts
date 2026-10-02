@@ -1509,11 +1509,11 @@ describe('limits', () => {
   });
 });
 
-// ---- known defects ----------------------------------------------------------
+// ---- regressions: bugs found in review, since fixed --------------------------
 
-describe('known defects', () => {
-  // "ids must be unique; duplicates get a fresh id" -- but the fresh id is not checked against
-  // the ids that are still to come. Harmless with UUIDs, wrong with any sequential generator.
+describe('regressions', () => {
+  // A repaired id used to be able to collide with an explicit id elsewhere in the same backup.
+  // Harmless with UUIDs, wrong with any sequential generator.
   it('a generated id never collides with an explicit id elsewhere in the same backup', () => {
     const data = normalized({
       expenses: [rawExpense({ id: 'gen-1' }), rawExpense({ id: undefined, amount: 200 })],
@@ -1527,8 +1527,8 @@ describe('known defects', () => {
     expect(new Set(goals.goals.map((g) => g.id)).size).toBe(2);
   });
 
-  // The folder's own id is trimmed and cut to 60 characters, but the id an expense uses to find
-  // it is compared as written, so the two stop matching and the expense silently loses its folder.
+  // Folder ids are trimmed and cut to 60 characters, so the reference an expense holds must be treated
+  // the same way, or the two stop matching and the expense silently loses its folder.
   it('an expense still finds its folder when the folder id had to be trimmed or shortened', () => {
     const padded = normalized({
       categories: [rawCategory({ id: ' gym ' })],
@@ -1545,9 +1545,9 @@ describe('known defects', () => {
     expect(cut.expenses[0]!.categoryId).toBe(cut.categories[0]!.id);
   });
 
-  // `slice(0, max)` counts UTF-16 units, so it can cut an emoji in half and leave a lone surrogate
-  // (rendered as a replacement character, and turned into U+FFFD by any UTF-8 export).
-  describe('truncation can split an emoji in half', () => {
+  // Cutting by UTF-16 units used to split an emoji in half and leave a lone surrogate (rendered as a
+  // replacement character, and turned into U+FFFD by any UTF-8 export).
+  describe('truncation never splits an emoji', () => {
     const lonely = (build: () => string) => () => expect(hasLoneSurrogate(build())).toBe(false);
 
     it('expense note', lonely(() => normalized({ expenses: [rawExpense({ note: `a${'😀'.repeat(60)}` })] }).expenses[0]!.note));
@@ -1560,8 +1560,8 @@ describe('known defects', () => {
     it('move zone', lonely(() => normalized({ expenses: [], goals: [rawGoal({ kind: 'move', move: rawMove({ zone: `a${'😀'.repeat(40)}` }) })] }).goals[0]!.move!.zone));
   });
 
-  // `trim()` runs before `slice()`, so cutting inside a run of blanks leaves trailing whitespace.
-  // Normalizing the result again trims it, so normalizeData is not idempotent for such input.
+  // Trimming before cutting used to leave trailing whitespace after a cut inside a run of blanks, so
+  // normalizeData was not idempotent for such input.
   it('a truncated note does not end in whitespace, so normalizing twice is the same as once', () => {
     const raw = { expenses: [rawExpense({ note: `${'a'.repeat(MAX_NOTE_LENGTH - 1)}   b` })] };
     const once = normalized(raw);

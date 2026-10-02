@@ -1,13 +1,23 @@
-import { FALLBACK_CATEGORY_ID, pickNewCategoryColor } from './categories';
+import { FALLBACK_CATEGORY_ID, isColorKey, pickNewCategoryColor } from './categories';
 import {
+  GOAL_KINDS,
   MAX_NAME_LENGTH,
   MAX_NOTE_LENGTH,
+  THEMES,
+  cleanText,
+  clampDay,
   createInitialData,
+  isUsableLocale,
   makeIdGenerator,
+  nonNegativeCents,
   normalizeData,
+  normalizeMove,
+  normalizeTrip,
+  positiveCents,
 } from './data';
-import { isValidDateStr, todayStr } from './dates';
+import { addMonths, isValidDateStr, isValidMonthKey, monthKeyOf, todayStr } from './dates';
 import { mergeData, type MergeResult } from './backup';
+import { isSupportedCurrency } from './money';
 import { planRecurring } from './recurring';
 import type { AppData, Category, Cents, DateStr, Expense, Goal, GoalKind, MonthKey, MovePlan, Recurring, Settings, TripPlan } from './types';
 
@@ -72,7 +82,43 @@ export interface StoreOptions {
 
 export type Store = ReturnType<typeof createStore>;
 
-const cleanNote = (note: string | undefined): string => (note ?? '').trim().replace(/\s+/g, ' ').slice(0, MAX_NOTE_LENGTH);
+const cleanNote = (note: string | undefined): string => cleanText((note ?? '').replace(/\s+/g, ' '), MAX_NOTE_LENGTH);
+
+interface GoalFields {
+  id: string;
+  kind: GoalKind;
+  name: string;
+  emoji: string;
+  target: Cents;
+  deadline: MonthKey;
+  saved: Cents | undefined;
+  createdAt: number;
+  trip: TripPlan | undefined;
+  move: MovePlan | undefined;
+}
+
+/** A goal in the shape a reload would give back: clean text, a plan only on the kind it belongs to. */
+function shapeGoal(f: GoalFields): Goal {
+  const kind = GOAL_KINDS.includes(f.kind) ? f.kind : 'saving';
+  const goal: Goal = {
+    id: f.id,
+    kind,
+    name: cleanText(f.name, MAX_NAME_LENGTH) || 'Mi meta',
+    emoji: cleanText(f.emoji, 8) || '🎯',
+    target: f.target,
+    deadline: f.deadline,
+    saved: nonNegativeCents(f.saved),
+    createdAt: f.createdAt,
+  };
+  const trip = kind === 'trip' ? normalizeTrip(f.trip) : undefined;
+  const move = kind === 'move' ? normalizeMove(f.move) : undefined;
+  if (trip) goal.trip = trip;
+  if (move) goal.move = move;
+  return goal;
+}
+
+/** The later of two months; `null` counts as "never". */
+const laterMonth = (a: MonthKey | null, b: MonthKey): MonthKey => (a !== null && a > b ? a : b);
 
 export function createStore(options: StoreOptions = {}) {
   const storage = options.storage ?? null;
@@ -86,20 +132,20 @@ export function createStore(options: StoreOptions = {}) {
     status = { ...status, ...patch };
   };
 
-  function load(): AppData {
-    const fresh = () => createInitialData(options.language);
+  /** What storage holds, or `failed` when it couldn't be read at all (which is not the same as empty). */
+  function read(): { data: AppData } | { failed: true } {
+    const fresh = () => ({ data: createInitialData(options.language) });
     if (!storage) return fresh();
     let raw: string | null = null;
     try {
       raw = storage.getItem(DATA_KEY);
     } catch {
-      setStatus({ persistent: false });
-      return fresh();
+      return { failed: true };
     }
     if (raw === null) return fresh();
     try {
       const normalized = normalizeData(JSON.parse(raw), { makeId, language: options.language });
-      if (normalized) return normalized;
+      if (normalized) return { data: normalized };
     } catch {
       // fall through: unreadable
     }
@@ -112,10 +158,23 @@ export function createStore(options: StoreOptions = {}) {
     return fresh();
   }
 
-  let data: AppData = load();
+  // If the very first read fails there may be real data in there. Starting empty is fine, but
+  // saving over it would destroy it, so nothing is written until a later read succeeds.
+  let unreadable = false;
+  let data: AppData;
+  {
+    const first = read();
+    if ('failed' in first) {
+      unreadable = true;
+      setStatus({ persistent: false });
+      data = createInitialData(options.language);
+    } else {
+      data = first.data;
+    }
+  }
 
   function save() {
-    if (!storage) return;
+    if (!storage || unreadable) return;
     try {
       storage.setItem(DATA_KEY, JSON.stringify(data));
       storage.setItem(THEME_KEY, data.settings.theme);
@@ -142,9 +201,13 @@ export function createStore(options: StoreOptions = {}) {
       return () => listeners.delete(listener);
     },
 
-    /** Re-reads storage (another tab changed it). */
+    /** Re-reads storage (another tab changed it). When it can't be read, what is in memory is kept. */
     reload() {
-      data = load();
+      if (!storage) return;
+      const next = read();
+      if ('failed' in next) return;
+      unreadable = false;
+      data = next.data;
       listeners.forEach((l) => l());
     },
 
@@ -193,21 +256,22 @@ export function createStore(options: StoreOptions = {}) {
     /** Puts back an expense removed by `deleteExpense` (undo). */
     restoreExpense(expense: Expense) {
       if (data.expenses.some((e) => e.id === expense.id)) return;
-      commit({ ...data, expenses: [...data.expenses, expense] });
+      commit({ ...data, expenses: [...data.expenses, { ...expense, categoryId: categoryIdOrFallback(expense.categoryId) }] });
     },
 
     // ---- folders
     addCategory(input: NewCategory): Category {
       const category: Category = {
         id: makeId(),
-        name: input.name.trim().slice(0, MAX_NAME_LENGTH) || 'Sin nombre',
-        emoji: input.emoji || '📦',
-        color: input.color ?? pickNewCategoryColor(data.categories),
-        flexible: input.flexible ?? false,
-        limit: input.limit ?? null,
+        name: cleanText(input.name, MAX_NAME_LENGTH) || 'Sin nombre',
+        emoji: cleanText(input.emoji, 8) || '📦',
+        color: isColorKey(input.color) ? input.color : pickNewCategoryColor(data.categories),
+        flexible: input.flexible === true,
+        limit: positiveCents(input.limit),
         archived: false,
-        ...(input.kind && { kind: input.kind }),
       };
+      const kind = cleanText(input.kind, 30);
+      if (kind) category.kind = kind;
       commit({ ...data, categories: [...data.categories, category] });
       return category;
     },
@@ -219,8 +283,12 @@ export function createStore(options: StoreOptions = {}) {
           c.id === id
             ? {
                 ...c,
-                ...patch,
-                ...(patch.name !== undefined && { name: patch.name.trim().slice(0, MAX_NAME_LENGTH) || c.name }),
+                ...(patch.name !== undefined && { name: cleanText(patch.name, MAX_NAME_LENGTH) || c.name }),
+                ...(patch.emoji !== undefined && { emoji: cleanText(patch.emoji, 8) || c.emoji }),
+                ...(isColorKey(patch.color) && { color: patch.color }),
+                ...(patch.flexible !== undefined && { flexible: patch.flexible === true }),
+                ...(patch.limit !== undefined && { limit: positiveCents(patch.limit) }),
+                ...(patch.archived !== undefined && { archived: patch.archived === true }),
               }
             : c,
         ),
@@ -240,12 +308,15 @@ export function createStore(options: StoreOptions = {}) {
 
     // ---- recurring ("próximos pagos")
     addRecurring(input: NewRecurring): Recurring {
+      const amount = positiveCents(input.amount);
+      if (amount === null) throw new Error('Invalid amount');
+      if (!isValidMonthKey(input.startMonth)) throw new Error('Invalid month');
       const rule: Recurring = {
         id: makeId(),
-        amount: input.amount,
+        amount,
         categoryId: categoryIdOrFallback(input.categoryId),
         note: cleanNote(input.note),
-        day: Math.min(31, Math.max(1, Math.trunc(input.day))),
+        day: clampDay(input.day),
         startMonth: input.startMonth,
         lastGenerated: null,
         active: true,
@@ -254,19 +325,27 @@ export function createStore(options: StoreOptions = {}) {
       return rule;
     },
 
-    updateRecurring(id: string, patch: Partial<Pick<Recurring, 'amount' | 'categoryId' | 'note' | 'day' | 'active'>>) {
+    /** `today` is only used when a paused rule is resumed (it defaults to the clock's day). */
+    updateRecurring(id: string, patch: Partial<Pick<Recurring, 'amount' | 'categoryId' | 'note' | 'day' | 'active'>>, today?: DateStr) {
+      const amount = patch.amount === undefined ? undefined : positiveCents(patch.amount);
+      if (amount === null) throw new Error('Invalid amount');
+      const resumeFrom = addMonths(monthKeyOf(today ?? todayStr(new Date(now()))), -1);
       commit({
         ...data,
-        recurring: data.recurring.map((r) =>
-          r.id === id
-            ? {
-                ...r,
-                ...patch,
-                ...(patch.note !== undefined && { note: cleanNote(patch.note) }),
-                ...(patch.day !== undefined && { day: Math.min(31, Math.max(1, Math.trunc(patch.day))) }),
-              }
-            : r,
-        ),
+        recurring: data.recurring.map((r) => {
+          if (r.id !== id) return r;
+          // A paused rule picks up from this month: the months it was paused are not paid back.
+          const resumed = patch.active === true && !r.active;
+          return {
+            ...r,
+            ...(patch.active !== undefined && { active: patch.active === true }),
+            ...(amount !== undefined && { amount }),
+            ...(patch.categoryId !== undefined && { categoryId: categoryIdOrFallback(patch.categoryId) }),
+            ...(patch.note !== undefined && { note: cleanNote(patch.note) }),
+            ...(patch.day !== undefined && { day: clampDay(patch.day) }),
+            ...(resumed && resumeFrom >= r.startMonth && { lastGenerated: laterMonth(r.lastGenerated, resumeFrom) }),
+          };
+        }),
       });
     },
 
@@ -297,33 +376,43 @@ export function createStore(options: StoreOptions = {}) {
     // ---- goals
     addGoal(input: NewGoal): Goal {
       if (!Number.isSafeInteger(input.target) || input.target <= 0) throw new Error('Invalid target');
-      const goal: Goal = {
+      if (!isValidMonthKey(input.deadline)) throw new Error('Invalid deadline');
+      const goal = shapeGoal({
         id: makeId(),
         kind: input.kind,
-        name: input.name.trim().slice(0, MAX_NAME_LENGTH) || 'Mi meta',
-        emoji: input.emoji || '🎯',
+        name: input.name,
+        emoji: input.emoji,
         target: input.target,
         deadline: input.deadline,
-        saved: Math.max(0, Math.round(input.saved ?? 0)),
+        saved: input.saved,
         createdAt: now(),
-        ...(input.trip && { trip: input.trip }),
-        ...(input.move && { move: input.move }),
-      };
+        trip: input.trip,
+        move: input.move,
+      });
       commit({ ...data, goals: [...data.goals, goal] });
       return goal;
     },
 
     updateGoal(id: string, patch: Partial<Omit<Goal, 'id' | 'createdAt'>>) {
+      if (patch.target !== undefined && positiveCents(patch.target) === null) throw new Error('Invalid target');
+      if (patch.deadline !== undefined && !isValidMonthKey(patch.deadline)) throw new Error('Invalid deadline');
       commit({
         ...data,
         goals: data.goals.map((g) =>
           g.id === id
-            ? {
-                ...g,
-                ...patch,
-                ...(patch.name !== undefined && { name: patch.name.trim().slice(0, MAX_NAME_LENGTH) || g.name }),
-                ...(patch.saved !== undefined && { saved: Math.max(0, Math.round(patch.saved)) }),
-              }
+            ? shapeGoal({
+                id: g.id,
+                createdAt: g.createdAt,
+                kind: GOAL_KINDS.includes(patch.kind as GoalKind) ? (patch.kind as GoalKind) : g.kind,
+                name: patch.name !== undefined ? cleanText(patch.name, MAX_NAME_LENGTH) || g.name : g.name,
+                emoji: patch.emoji !== undefined ? cleanText(patch.emoji, 8) || g.emoji : g.emoji,
+                target: patch.target !== undefined ? (positiveCents(patch.target) ?? g.target) : g.target,
+                deadline: patch.deadline ?? g.deadline,
+                saved: patch.saved !== undefined ? patch.saved : g.saved,
+                // `trip` and `move` are replaced when the patch names them (even with `undefined`), kept otherwise.
+                trip: 'trip' in patch ? patch.trip : g.trip,
+                move: 'move' in patch ? patch.move : g.move,
+              })
             : g,
         ),
       });
@@ -333,7 +422,7 @@ export function createStore(options: StoreOptions = {}) {
     addToGoal(id: string, delta: Cents): Goal | null {
       const current = data.goals.find((g) => g.id === id);
       if (!current) return null;
-      const updated = { ...current, saved: Math.max(0, current.saved + Math.round(delta)) };
+      const updated = { ...current, saved: Math.max(0, current.saved + (Number.isFinite(delta) ? Math.round(delta) : 0)) };
       commit({ ...data, goals: data.goals.map((g) => (g.id === id ? updated : g)) });
       return updated;
     },
@@ -351,8 +440,18 @@ export function createStore(options: StoreOptions = {}) {
     },
 
     // ---- settings & whole-data operations
+    /** Values a reload would repair or drop (a negative budget, an unknown theme...) are refused or cleaned here too. */
     updateSettings(patch: Partial<Settings>) {
-      commit({ ...data, settings: { ...data.settings, ...patch } });
+      const next: Settings = { ...data.settings };
+      if (patch.currency !== undefined && isSupportedCurrency(patch.currency)) next.currency = patch.currency;
+      if (patch.locale !== undefined && isUsableLocale(patch.locale)) next.locale = patch.locale;
+      if (patch.monthlyBudget !== undefined) next.monthlyBudget = positiveCents(patch.monthlyBudget);
+      if (patch.monthlyIncome !== undefined) next.monthlyIncome = positiveCents(patch.monthlyIncome);
+      if (patch.fxRate !== undefined) next.fxRate = typeof patch.fxRate === 'number' && Number.isFinite(patch.fxRate) && patch.fxRate > 0 ? patch.fxRate : null;
+      if (patch.theme !== undefined && THEMES.includes(patch.theme)) next.theme = patch.theme;
+      if (patch.haptics !== undefined) next.haptics = patch.haptics !== false;
+      if (patch.onboarded !== undefined) next.onboarded = patch.onboarded === true;
+      commit({ ...data, settings: next });
     },
 
     replaceAll(next: AppData) {
