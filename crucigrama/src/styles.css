@@ -164,7 +164,6 @@ input:focus { outline: none; border-color: var(--sky); }
 .osk button { flex: 1; max-width: 42px; height: 50px; border-radius: 12px; border: 2px solid var(--line); border-bottom-width: 5px; background: var(--card); font: 700 1.15rem var(--head); display: grid; place-items: center; }
 .osk button:active { transform: translateY(3px); border-bottom-width: 2px; background: var(--brand-soft); }
 .osk button.wide { max-width: 66px; color: var(--muted); }
-@media (hover: hover) and (min-width: 700px) { .osk { display: none; } }
 
 .clues { display: grid; gap: 4px; }
 .segmented { display: grid; grid-template-columns: 1fr 1fr; background: var(--line); padding: 4px; border-radius: 16px; margin-bottom: 6px; }

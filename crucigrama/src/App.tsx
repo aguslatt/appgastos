@@ -27,10 +27,13 @@ function Setup({ onSave }: { onSave: (p: Profile) => void }) {
       </section>
       <section className="card form">
         <label htmlFor="name">Tu nombre</label>
-        <input id="name" value={name} onChange={(e) => setName(e.target.value)} maxLength={20} autoComplete="off" />
+        <input id="name" type="text" inputMode="text" enterKeyHint="next" value={name} onChange={(e) => setName(e.target.value)} maxLength={20} autoComplete="off" />
         <label htmlFor="room">Código del grupo</label>
         <input
           id="room"
+          type="text"
+          inputMode="text"
+          enterKeyHint="go"
           placeholder="ej: agus-y-juli"
           value={room}
           onChange={(e) => setRoom(e.target.value.toLowerCase().replace(/\s+/g, '-'))}
