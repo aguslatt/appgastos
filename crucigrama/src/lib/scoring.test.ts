@@ -56,5 +56,8 @@ describe('stats', () => {
     expect(s[0]!.best).toBe(800);
     expect(s[2]!.played).toBe(0);
     expect(s[0]!.last7.at(-1)!.points).toBe(150);
+    const oct = computeStats(res, [], '2026-10-29', '2026-10');
+    expect(oct[0]!.period).toBe(360);
+    expect(computeStats(res, [], '2026-10-29', '2026-09')[0]!.period).toBe(0);
   });
 });

@@ -4,6 +4,8 @@ import type { Result } from './store';
 export interface PlayerStats {
   name: string;
   week: number;
+  period: number; // puntos del período elegido (semana o mes)
+  periodPlayed: number;
   total: number;
   played: number;
   best: number | null; // mejor tiempo, en segundos
@@ -21,7 +23,7 @@ export function playerColor(name: string, members: string[]): string {
   return COLORS[Math.max(0, i) % COLORS.length]!;
 }
 
-export function computeStats(results: Result[], extraMembers: string[], today: string): PlayerStats[] {
+export function computeStats(results: Result[], extraMembers: string[], today: string, ym?: string): PlayerStats[] {
   const crossword = results.filter((r) => r.game === 'crossword');
   const names = [...new Set([...extraMembers, ...crossword.map((r) => r.player)])].filter(Boolean);
   const wk = weekStart(today);
@@ -36,9 +38,12 @@ export function computeStats(results: Result[], extraMembers: string[], today: s
         cursor = addDays(cursor, -1);
       }
       const times = mine.map((r) => r.seconds);
+      const inPeriod = ym ? mine.filter((r) => r.day.startsWith(ym)) : mine.filter((r) => weekStart(r.day) === wk);
       return {
         name,
         week: mine.filter((r) => weekStart(r.day) === wk).reduce((s, r) => s + r.points, 0),
+        period: inPeriod.reduce((s, r) => s + r.points, 0),
+        periodPlayed: inPeriod.length,
         total: mine.reduce((s, r) => s + r.points, 0),
         played: mine.length,
         best: times.length ? Math.min(...times) : null,
@@ -51,7 +56,7 @@ export function computeStats(results: Result[], extraMembers: string[], today: s
         history: mine,
       };
     })
-    .sort((a, b) => b.week - a.week || b.total - a.total || a.name.localeCompare(b.name));
+    .sort((a, b) => b.period - a.period || b.total - a.total || a.name.localeCompare(b.name));
 }
 
 export const MAX_POINTS = Math.round(GAMES.crossword.base * 1.5);

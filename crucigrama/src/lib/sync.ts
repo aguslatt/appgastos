@@ -40,7 +40,16 @@ export async function pullResults(room: string): Promise<Result[]> {
     const remote = (await res.json()) as Result[];
     const key = (r: Result) => `${r.player}|${r.day}|${r.game}`;
     const seen = new Set(remote.map(key));
-    return [...remote, ...local.filter((r) => !seen.has(key(r)))];
+    const missing = local.filter((r) => !seen.has(key(r)));
+    // Lo que quedó solo en este teléfono (por ejemplo sin internet) se sube ahora.
+    if (missing.length) {
+      void fetch(`${URL_}/rest/v1/scores?on_conflict=room,player,day,game`, {
+        method: 'POST',
+        headers: { ...headers(), Prefer: 'resolution=ignore-duplicates' },
+        body: JSON.stringify(missing),
+      }).catch(() => undefined);
+    }
+    return [...remote, ...missing];
   } catch {
     return local;
   }

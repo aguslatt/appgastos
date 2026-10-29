@@ -5,7 +5,7 @@ import { Flame, Icon, Tile } from './components';
 import { buildCrossword } from './lib/crossword';
 import { dayKey, fmtTime, longDate, shortWeekday } from './lib/scoring';
 import { computeStats, playerColor, MAX_POINTS, type PlayerStats } from './lib/stats';
-import { loadProfile, saveProfile, type Profile, type Result } from './lib/store';
+import { exportBackup, importBackup, loadProfile, saveProfile, type Profile, type Result } from './lib/store';
 import { online, pullResults, pushResult } from './lib/sync';
 
 type Tab = 'play' | 'points';
@@ -47,7 +47,7 @@ function Setup({ onSave }: { onSave: (p: Profile) => void }) {
   );
 }
 
-function ProfileCard({ s, rank, color, max, me }: { s: PlayerStats; rank: number; color: string; max: number; me: boolean }) {
+function ProfileCard({ s, rank, color, max, me, label }: { s: PlayerStats; rank: number; color: string; max: number; me: boolean; label: string }) {
   const peak = Math.max(1, ...s.last7.map((d) => d.points));
   return (
     <article className="card profile">
@@ -55,16 +55,16 @@ function ProfileCard({ s, rank, color, max, me }: { s: PlayerStats; rank: number
         <Tile name={s.name} color={color} size={64} mood={s.played ? 'happy' : 'sleep'} />
         <div>
           <h3>{s.name}{me && <span className="you">vos</span>}</h3>
-          <p className="muted">{rank === 0 && s.week > 0 ? 'Va primero esta semana' : `Puesto ${rank + 1} esta semana`}</p>
+          <p className="muted">{rank === 0 && s.period > 0 ? `Va primero ${label}` : `Puesto ${rank + 1} ${label}`}</p>
         </div>
-        <p className="big">{s.week}<small>pts</small></p>
+        <p className="big">{s.period}<small>pts</small></p>
       </div>
-      <div className="meter"><div style={{ width: `${(s.week / max) * 100}%`, background: color }} /></div>
+      <div className="meter"><div style={{ width: `${(s.period / max) * 100}%`, background: color }} /></div>
       <dl className="stat-grid">
         <div className="stat"><dt><Flame size={18} lit={s.streak > 0} /> Racha</dt><dd>{s.streak} {s.streak === 1 ? 'día' : 'días'}</dd></div>
         <div className="stat"><dt><Icon name="trophy" size={16} /> Total</dt><dd>{s.total} pts</dd></div>
         <div className="stat"><dt><Icon name="clock" size={16} /> Mejor tiempo</dt><dd>{s.best ? fmtTime(s.best) : '–'}</dd></div>
-        <div className="stat"><dt><Icon name="grid" size={16} /> Partidas</dt><dd>{s.played}</dd></div>
+        <div className="stat"><dt><Icon name="grid" size={16} /> Partidas</dt><dd>{s.periodPlayed} <small>de {s.played}</small></dd></div>
       </dl>
       <div className="week" aria-label="Últimos 7 días">
         {s.last7.map((d) => (
@@ -83,6 +83,8 @@ export function App() {
   const [view, setView] = useState<View>({ name: 'home' });
   const [tab, setTab] = useState<Tab>('play');
   const [results, setResults] = useState<Result[]>([]);
+  const [period, setPeriod] = useState<'week' | 'month'>('week');
+  const [backupMsg, setBackupMsg] = useState('');
   const today = dayKey();
   const puzzle = useMemo(() => buildCrossword(today), [today]);
 
@@ -96,7 +98,11 @@ export function App() {
     return () => clearInterval(id);
   }, [refresh]);
 
-  const stats = useMemo(() => computeStats(results, profile ? [profile.name] : [], today), [results, profile, today]);
+  const [ym, setYm] = useState(today.slice(0, 7));
+  const stats = useMemo(
+    () => computeStats(results, profile ? [profile.name] : [], today, period === 'month' ? ym : undefined),
+    [results, profile, today, period, ym],
+  );
   const members = stats.map((s) => s.name);
 
   if (!profile) {
@@ -119,9 +125,40 @@ export function App() {
   const todays = results.filter((r) => r.game === 'crossword' && r.day === today);
   const mine = todays.find((r) => r.player === profile.name);
   const fastest = todays.length > 1 ? Math.min(...todays.map((r) => r.seconds)) : null;
-  const max = Math.max(1, ...stats.map((s) => s.week));
+  const max = Math.max(1, ...stats.map((s) => s.period));
   const history = results.filter((r) => r.game === 'crossword').sort((a, b) => b.day.localeCompare(a.day) || b.points - a.points);
-  const days = [...new Set(history.map((r) => r.day))].slice(0, 14);
+  const allDays = [...new Set(history.map((r) => r.day))];
+  const days = period === 'month' ? allDays.filter((d) => d.startsWith(ym)) : allDays.slice(0, 14);
+  const monthLabel = (() => {
+    const s = new Date(ym + '-15T12:00:00').toLocaleDateString('es', { month: 'long', year: 'numeric' });
+    return s.charAt(0).toUpperCase() + s.slice(1);
+  })();
+  const shiftMonth = (n: number) => {
+    const d = new Date(ym + '-15T12:00:00');
+    d.setMonth(d.getMonth() + n);
+    setYm(d.toISOString().slice(0, 7));
+  };
+  const periodLabel = period === 'month' ? 'en el mes' : 'esta semana';
+  const monthGames = new Set(results.filter((r) => r.day.startsWith(ym)).map((r) => r.day)).size;
+  const doBackup = () => {
+    const blob = new Blob([exportBackup()], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `crucigrama-${today}.json`;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    setBackupMsg('Copia descargada.');
+  };
+  const doRestore = async (file: File | undefined) => {
+    if (!file) return;
+    try {
+      const added = importBackup(await file.text());
+      await refresh();
+      setBackupMsg(added ? `Recuperé ${added} ${added === 1 ? 'partida' : 'partidas'}.` : 'No había partidas nuevas.');
+    } catch {
+      setBackupMsg('No pude leer ese archivo.');
+    }
+  };
   const other = members.find((n) => n !== profile.name);
 
   return (
@@ -200,27 +237,38 @@ export function App() {
           <header className="top">
             <div>
               <h1>Puntos</h1>
-              <p className="muted">Grupo <b>{profile.room}</b> · esta semana</p>
+              <p className="muted">Grupo <b>{profile.room}</b></p>
             </div>
           </header>
+          <div className="segmented" role="tablist">
+            <button role="tab" aria-selected={period === 'week'} className={period === 'week' ? 'on' : ''} onClick={() => setPeriod('week')}>Semana</button>
+            <button role="tab" aria-selected={period === 'month'} className={period === 'month' ? 'on' : ''} onClick={() => setPeriod('month')}>Mes</button>
+          </div>
+          {period === 'month' && (
+            <div className="month-nav">
+              <button className="icon-btn" onClick={() => shiftMonth(-1)} aria-label="Mes anterior"><Icon name="back" /></button>
+              <div><strong>{monthLabel}</strong><p className="muted">{monthGames} {monthGames === 1 ? 'día jugado' : 'días jugados'}</p></div>
+              <button className="icon-btn next" onClick={() => shiftMonth(1)} disabled={ym >= today.slice(0, 7)} aria-label="Mes siguiente"><Icon name="back" /></button>
+            </div>
+          )}
           <section className="card board">
             {stats.map((s, i) => (
               <div className="board-row" key={s.name}>
                 <span className={`rank r${i + 1}`}>{i + 1}</span>
                 <Tile name={s.name} color={color(s.name)} size={44} mood={s.played ? 'happy' : 'sleep'} />
                 <strong>{s.name}</strong>
-                <b>{s.week} <small>pts</small></b>
+                <b>{s.period} <small>pts</small></b>
               </div>
             ))}
           </section>
           <section className="stack">
             {stats.map((s, i) => (
-              <ProfileCard key={s.name} s={s} rank={i} color={color(s.name)} max={max} me={s.name === profile.name} />
+              <ProfileCard key={s.name} s={s} rank={i} color={color(s.name)} max={max} me={s.name === profile.name} label={periodLabel} />
             ))}
           </section>
           <section>
-            <h2 className="h2">Historial</h2>
-            {days.length === 0 && <p className="muted">Todavía no hay partidas. La primera marca el ritmo.</p>}
+            <h2 className="h2">{period === 'month' ? `Historial de ${monthLabel}` : 'Últimos días'}</h2>
+            {days.length === 0 && <p className="muted">{period === 'month' ? 'No hay partidas en este mes.' : 'Todavía no hay partidas. La primera marca el ritmo.'}</p>}
             {days.map((d) => (
               <div className="card day" key={d}>
                 <p className="day-title">{longDate(d)}</p>
@@ -234,6 +282,15 @@ export function App() {
                 ))}
               </div>
             ))}
+          </section>
+          <section className="card backup">
+            <h3>Copia de seguridad</h3>
+            <p className="muted">{online ? 'Tus partidas se guardan en el servidor y también en este teléfono.' : 'Tus partidas se guardan solo en este teléfono. Descargá una copia de vez en cuando.'}</p>
+            <div className="backup-actions">
+              <button className="btn white" onClick={doBackup}>Descargar copia</button>
+              <label className="btn white file">Restaurar<input type="file" accept="application/json" onChange={(e) => void doRestore(e.target.files?.[0])} hidden /></label>
+            </div>
+            {backupMsg && <p className="muted" role="status">{backupMsg}</p>}
           </section>
           <button className="link" onClick={() => { try { localStorage.removeItem('cg:profile'); } catch { /* ok */ } setProfile(null); }}>
             Cambiar de perfil o de grupo

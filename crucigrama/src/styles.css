@@ -199,3 +199,15 @@ input:focus { outline: none; border-color: var(--sky); }
 /* Vista "Ver todo": casilleros chicos, bordes finos */
 .cw-grid:not(.big) { gap: 2px; }
 .cw-grid:not(.big) .cell { border-width: 1.5px; border-bottom-width: 2.5px; border-radius: 4px; }
+
+/* Mes y copia de seguridad */
+.month-nav { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 12px; text-align: center; }
+.month-nav strong { font: 700 1.2rem var(--head); }
+.month-nav .next svg { transform: rotate(180deg); }
+.month-nav .icon-btn:disabled { opacity: 0.35; }
+.segmented { margin-bottom: 0; }
+.backup { display: grid; gap: 10px; }
+.backup h3 { font: 700 1.1rem var(--head); }
+.backup-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.backup .btn { font-size: 0.85rem; padding: 12px 8px; cursor: pointer; }
+.stat dd small { font: 700 0.75rem var(--ui); color: var(--muted); }
