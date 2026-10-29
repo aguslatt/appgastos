@@ -1,0 +1,49 @@
+:root {
+  --bg: #f4f1ea; --ink: #1d2433; --muted: #6b7280; --card: #fff; --line: #d9d4c7;
+  --brand: #1d3557; --accent: #e63946; --sel: #ffd166; --word: #cfe3ff; --ok: #2a9d8f;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #14171f; --ink: #eef0f5; --muted: #98a0b3; --card: #1e2330; --line: #323a4d; --sel: #b8860b; --word: #26406b; }
+}
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.4 system-ui, sans-serif; }
+button { font: inherit; color: inherit; cursor: pointer; }
+h1 { font-size: 1.5rem; margin: 0.5rem 0; } h2 { font-size: 1.1rem; margin: 1.2rem 0 0.4rem; } h3 { font-size: 0.95rem; margin: 0.4rem 0; }
+.muted { color: var(--muted); font-size: 0.9rem; } .center { text-align: center; }
+.home, .setup, .game { max-width: 560px; margin: 0 auto; padding: 16px; padding-bottom: 40px; }
+.setup { display: grid; gap: 12px; padding-top: 12vh; }
+input { font: inherit; padding: 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--card); color: var(--ink); }
+.btn { padding: 12px 16px; border-radius: 12px; border: 1px solid var(--line); background: var(--card); }
+.btn.primary { background: var(--brand); color: #fff; border-color: var(--brand); font-weight: 600; }
+.btn:disabled { opacity: 0.5; }
+.link { background: none; border: 0; color: var(--brand); padding: 8px 0; }
+@media (prefers-color-scheme: dark) { .link { color: #9ec1ff; } }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 14px; display: grid; gap: 8px; margin-bottom: 10px; }
+.card-head, .row { display: flex; justify-content: space-between; gap: 8px; align-items: center; }
+.badge { background: var(--ok); color: #fff; border-radius: 99px; padding: 2px 10px; font-size: 0.85rem; }
+
+.bar { display: flex; justify-content: space-between; align-items: center; }
+.timer { font-variant-numeric: tabular-nums; font-weight: 700; background: var(--brand); color: #fff; border-radius: 8px; padding: 2px 10px; }
+.clue-now { margin: 8px 0; padding: 10px; min-height: 3.2em; background: var(--card); border: 1px solid var(--line); border-radius: 10px; }
+.cw-grid { display: grid; gap: 2px; aspect-ratio: 1; touch-action: manipulation; }
+.cell { position: relative; padding: 0; border: 1px solid var(--line); background: var(--card); border-radius: 3px; display: grid; place-items: center; font-weight: 700; font-size: clamp(0.8rem, 4vw, 1.3rem); }
+.cell.blank { background: transparent; border-color: transparent; }
+.cell.word { background: var(--word); } .cell.sel { background: var(--sel); }
+.cell i { position: absolute; top: 1px; left: 3px; font-size: 0.55rem; font-style: normal; font-weight: 600; color: var(--muted); }
+.actions { display: flex; gap: 8px; margin: 10px 0; } .actions .btn { flex: 1; padding: 8px; }
+.osk { display: grid; gap: 6px; margin-bottom: 14px; }
+.osk-row { display: flex; gap: 4px; justify-content: center; }
+.osk button { flex: 1; max-width: 42px; height: 46px; border-radius: 8px; border: 1px solid var(--line); background: var(--card); font-weight: 600; }
+.osk button.wide { max-width: 64px; }
+@media (hover: hover) and (min-width: 700px) { .osk { display: none; } }
+.clues { display: grid; gap: 10px; } .clue { display: block; width: 100%; text-align: left; background: none; border: 0; padding: 6px 4px; border-radius: 6px; }
+.clue.on { background: var(--word); }
+.ws-grid { display: grid; gap: 2px; aspect-ratio: 1; touch-action: none; user-select: none; margin: 8px 0; }
+.ws-cell { display: grid; place-items: center; font-weight: 700; background: var(--card); border-radius: 4px; border: 1px solid var(--line); font-size: clamp(0.8rem, 4vw, 1.2rem); }
+.ws-cell.found { background: var(--ok); color: #fff; } .ws-cell.drag { background: var(--sel); }
+.ws-words { list-style: none; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.ws-words li { padding: 3px 10px; border-radius: 99px; background: var(--card); border: 1px solid var(--line); font-size: 0.85rem; }
+.ws-words li.done { text-decoration: line-through; opacity: 0.55; }
+.finish { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.55); display: grid; place-items: center; z-index: 10; padding: 16px; }
+.finish-card { background: var(--card); border-radius: 18px; padding: 24px; display: grid; gap: 10px; text-align: center; width: min(360px, 100%); }
+.finish-card .big { font-size: 2.4rem; font-weight: 800; margin: 0; } .confetti { font-size: 3rem; }
