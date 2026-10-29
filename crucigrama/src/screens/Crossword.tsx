@@ -145,6 +145,7 @@ export function CrosswordGame({ day, onDone, onBack }: Props) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.ctrlKey || e.metaKey || e.altKey) return;
+      if ((e.target as HTMLElement | null)?.tagName === 'INPUT') return;
       if (/^[a-zA-Z]$/.test(e.key)) type(e.key.toUpperCase());
       else if (e.key === 'Backspace') erase();
       else if (e.key === ' ' || e.key === 'Tab') {

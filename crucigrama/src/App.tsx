@@ -33,11 +33,11 @@ function Setup({ onSave }: { onSave: (p: Profile) => void }) {
           id="room"
           placeholder="ej: agus-y-juli"
           value={room}
-          onChange={(e) => setRoom(e.target.value.toLowerCase().replace(/\s/g, ''))}
+          onChange={(e) => setRoom(e.target.value.toLowerCase().replace(/\s+/g, '-'))}
           maxLength={30}
           autoComplete="off"
         />
-        <p className="muted">Los dos escriben el mismo código y cada uno su nombre: así quedan en el mismo grupo.</p>
+        <p className="muted">Los dos escriben el mismo código (los espacios se vuelven guiones) y cada uno su nombre: así quedan en el mismo grupo.</p>
         <button className="btn go" disabled={!ok} onClick={() => onSave({ name: name.trim(), room: room.trim() })}>
           Entrar al grupo
         </button>
