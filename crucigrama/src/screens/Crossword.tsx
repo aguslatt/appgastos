@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { buildCrossword, wordCells, type Dir, type Placed } from '../lib/crossword';
 import { HINT_COST, fmtTime, score } from '../lib/scoring';
 import { useGameClock } from '../hooks';
@@ -27,6 +27,25 @@ export function CrosswordGame({ day, onDone, onBack }: Props) {
   });
   const [dir, setDir] = useState<Dir>('across');
   const [zoom, setZoom] = useState(false);
+  const [toast, setToast] = useState('');
+  const [popping, setPopping] = useState<Set<string>>(new Set());
+
+  const wordKey = (w: Placed) => `${w.n}${w.dir}`;
+  const solved = useMemo(() => {
+    const s = new Set<string>();
+    for (const w of puzzle.words) {
+      if (wordCells(w).every(([r, c], i) => letters[r]![c] === w.answer[i])) s.add(wordKey(w));
+    }
+    return s;
+  }, [letters, puzzle]);
+  const locked = useMemo(() => {
+    const s = new Set<string>();
+    for (const w of puzzle.words) {
+      if (solved.has(wordKey(w))) for (const [r, c] of wordCells(w)) s.add(`${r},${c}`);
+    }
+    return s;
+  }, [solved, puzzle]);
+  const prevSolved = useRef(solved);
 
   const wordAt = useCallback(
     (r: number, c: number, d: Dir): Placed | undefined =>
@@ -36,6 +55,31 @@ export function CrosswordGame({ day, onDone, onBack }: Props) {
   const active = wordAt(sel[0], sel[1], dir) ?? wordAt(sel[0], sel[1], dir === 'across' ? 'down' : 'across');
   const activeCells = active ? wordCells(active) : [];
   const activeDir = active?.dir ?? dir;
+
+  useEffect(() => {
+    const fresh = puzzle.words.filter((w) => solved.has(wordKey(w)) && !prevSolved.current.has(wordKey(w)));
+    prevSolved.current = solved;
+    if (!fresh.length) return;
+    const cells = new Set<string>();
+    for (const w of fresh) for (const [r, c] of wordCells(w)) cells.add(`${r},${c}`);
+    setPopping(cells);
+    setToast(`¡Bien! ${fresh[0]!.answer}`);
+    try { navigator.vibrate?.(40); } catch { /* sin vibración */ }
+    const t1 = setTimeout(() => setPopping(new Set()), 700);
+    const t2 = setTimeout(() => setToast(''), 1600);
+    // Salta a la próxima palabra que falta resolver.
+    const order = puzzle.words;
+    const from = order.indexOf(fresh[0]!);
+    const next = [...order.slice(from + 1), ...order.slice(0, from)].find((w) => !solved.has(wordKey(w)));
+    if (next) {
+      const cells2 = wordCells(next);
+      const empty = cells2.find(([r, c]) => letters[r]![c] !== puzzle.cells[r]![c]) ?? cells2[0]!;
+      setSel(empty);
+      setDir(next.dir);
+    }
+    return () => { clearTimeout(t1); clearTimeout(t2); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [solved]);
 
   useEffect(() => {
     if (!finished && elapsed % 5 === 0) save(hints, letters);
@@ -60,6 +104,7 @@ export function CrosswordGame({ day, onDone, onBack }: Props) {
 
   const type = (ch: string) => {
     if (finished || !puzzle.cells[sel[0]]![sel[1]]) return;
+    if (locked.has(`${sel[0]},${sel[1]}`)) return advance(sel[0], sel[1]);
     const grid = letters.map((row) => row.slice());
     grid[sel[0]]![sel[1]] = ch;
     setLetters(grid);
@@ -68,6 +113,7 @@ export function CrosswordGame({ day, onDone, onBack }: Props) {
   };
   const erase = () => {
     if (finished) return;
+    if (locked.has(`${sel[0]},${sel[1]}`)) return advance(sel[0], sel[1], true);
     const grid = letters.map((row) => row.slice());
     if (grid[sel[0]]![sel[1]]) grid[sel[0]]![sel[1]] = '';
     else advance(sel[0], sel[1], true);
@@ -128,10 +174,11 @@ export function CrosswordGame({ day, onDone, onBack }: Props) {
     <div className="game">
       <header className="bar">
         <button className="link" onClick={onBack}>← Volver</button>
-        <strong>Crucigrama</strong>
+        <strong>Crucigrama · {solved.size}/{puzzle.words.length}</strong>
         <span className="timer">{fmtTime(elapsed)}</span>
       </header>
 
+      {toast && <div className="toast" role="status">{toast}</div>}
       <div className="clue-now">
         {active ? (
           <>
@@ -150,7 +197,7 @@ export function CrosswordGame({ day, onDone, onBack }: Props) {
             return (
               <button
                 key={`${r}-${c}`}
-                className={`cell${isSel ? ' sel' : inWord ? ' word' : ''}`}
+                className={`cell${isSel ? ' sel' : inWord ? ' word' : ''}${locked.has(`${r},${c}`) ? ' solved' : ''}${popping.has(`${r},${c}`) ? ' pop' : ''}`}
                 onClick={() => tap(r, c)}
                 aria-label={`fila ${r + 1} columna ${c + 1}`}
               >
@@ -189,10 +236,10 @@ export function CrosswordGame({ day, onDone, onBack }: Props) {
             {list(d).map((w) => (
               <button
                 key={`${w.n}${d}`}
-                className={`clue${active === w ? ' on' : ''}`}
+                className={`clue${active === w ? ' on' : ''}${solved.has(wordKey(w)) ? ' solved' : ''}`}
                 onClick={() => pickClue(w)}
               >
-                <b>{w.n}</b> {w.clue} <span className="muted">({w.answer.length})</span>
+                <b>{solved.has(wordKey(w)) ? '✓' : w.n}</b> {w.clue} <span className="muted">({w.answer.length})</span>
               </button>
             ))}
           </section>

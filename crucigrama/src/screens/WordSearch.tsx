@@ -31,6 +31,7 @@ export function WordSearchGame({ day, onDone, onBack }: Props) {
   const [drag, setDrag] = useState<Cell[]>([]);
   const start = useRef<Cell | null>(null);
   const gridRef = useRef<HTMLDivElement>(null);
+  const [toast, setToast] = useState('');
 
   const foundCells = new Set<string>();
   for (const w of puzzle.words) {
@@ -70,6 +71,9 @@ export function WordSearchGame({ day, onDone, onBack }: Props) {
     const next = [...found, hit.answer];
     setFound(next);
     save(0, next);
+    setToast(`¡Bien! ${hit.answer}`);
+    try { navigator.vibrate?.(40); } catch { /* sin vibración */ }
+    setTimeout(() => setToast(''), 1500);
     if (next.length === puzzle.words.length) {
       setFinished(true);
       onDone(elapsed, score('wordsearch', elapsed, 0));
@@ -83,8 +87,9 @@ export function WordSearchGame({ day, onDone, onBack }: Props) {
         <strong>Sopa de letras</strong>
         <span className="timer">{fmtTime(elapsed)}</span>
       </header>
-      <p className="muted center">Arrastrá el dedo sobre la palabra (en cualquier dirección, también al revés). {found.length}/{puzzle.words.length}</p>
+      <p className="muted center">Encontrá la palabra que responde a cada pista. Arrastrá el dedo sobre ella, en cualquier dirección, también al revés. {found.length}/{puzzle.words.length}</p>
 
+      {toast && <div className="toast" role="status">{toast}</div>}
       <div
         ref={gridRef}
         className="ws-grid"
@@ -110,7 +115,9 @@ export function WordSearchGame({ day, onDone, onBack }: Props) {
 
       <ul className="ws-words">
         {puzzle.words.map((w) => (
-          <li key={w.answer} className={found.includes(w.answer) ? 'done' : ''}>{w.answer}</li>
+          <li key={w.answer} className={found.includes(w.answer) ? 'done' : ''}>
+            {found.includes(w.answer) ? `✓ ${w.answer}` : `${w.clue} (${w.answer.length})`}
+          </li>
         ))}
       </ul>
     </div>

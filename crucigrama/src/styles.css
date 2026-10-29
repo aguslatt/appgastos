@@ -42,11 +42,21 @@ input { font: inherit; padding: 12px; border-radius: 10px; border: 1px solid var
 .clues { display: grid; gap: 10px; } .clue { display: block; width: 100%; text-align: left; background: none; border: 0; padding: 6px 4px; border-radius: 6px; }
 .clue.on { background: var(--word); }
 .ws-grid { display: grid; gap: 2px; aspect-ratio: 1; touch-action: none; user-select: none; margin: 8px 0; }
-.ws-cell { display: grid; place-items: center; font-weight: 700; background: var(--card); border-radius: 4px; border: 1px solid var(--line); font-size: clamp(0.8rem, 4vw, 1.2rem); }
+.ws-cell { display: grid; place-items: center; font-weight: 700; background: var(--card); border-radius: 4px; border: 1px solid var(--line); font-size: clamp(0.7rem, 3.4vw, 1.1rem); }
 .ws-cell.found { background: var(--ok); color: #fff; } .ws-cell.drag { background: var(--sel); }
-.ws-words { list-style: none; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
-.ws-words li { padding: 3px 10px; border-radius: 99px; background: var(--card); border: 1px solid var(--line); font-size: 0.85rem; }
+.ws-words { list-style: none; padding: 0; display: grid; gap: 6px; }
+.ws-words li { padding: 6px 12px; border-radius: 10px; background: var(--card); border: 1px solid var(--line); font-size: 0.85rem; }
 .ws-words li.done { text-decoration: line-through; opacity: 0.55; }
 .finish { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.55); display: grid; place-items: center; z-index: 10; padding: 16px; }
 .finish-card { background: var(--card); border-radius: 18px; padding: 24px; display: grid; gap: 10px; text-align: center; width: min(360px, 100%); }
 .finish-card .big { font-size: 2.4rem; font-weight: 800; margin: 0; } .confetti { font-size: 3rem; }
+
+.cell.solved { background: var(--ok); color: #fff; border-color: var(--ok); }
+.cell.solved i { color: #fff; opacity: 0.8; }
+.cell.solved.sel { outline: 2px solid var(--sel); }
+@keyframes pop { 0% { transform: scale(1); } 40% { transform: scale(1.25); } 100% { transform: scale(1); } }
+.cell.pop { animation: pop 0.5s ease; }
+.clue.solved { text-decoration: line-through; opacity: 0.55; }
+.clue.solved b { color: var(--ok); }
+.toast { position: fixed; left: 50%; top: calc(env(safe-area-inset-top, 0px) + 60px); transform: translateX(-50%); background: var(--ok); color: #fff; padding: 8px 18px; border-radius: 99px; font-weight: 700; z-index: 20; box-shadow: 0 4px 14px rgba(0,0,0,0.25); }
+@media (prefers-reduced-motion: reduce) { .cell.pop { animation: none; } }

@@ -45,7 +45,7 @@ describe('crossword', () => {
 describe('wordsearch', () => {
   it('esconde todas las palabras en su lugar', () => {
     const ws = buildWordSearch('2026-10-29');
-    expect(ws.words.length).toBeGreaterThanOrEqual(7);
+    expect(ws.words.length).toBeGreaterThanOrEqual(12);
     for (const w of ws.words) {
       for (let i = 0; i < w.answer.length; i++) {
         expect(ws.grid[w.row + w.dr * i]![w.col + w.dc * i]).toBe(w.answer[i]);
