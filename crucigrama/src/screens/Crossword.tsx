@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { buildCrossword, wordCells, type Dir, type Placed } from '../lib/crossword';
 import { HINT_COST, fmtTime, score } from '../lib/scoring';
 import { useGameClock } from '../hooks';
+import { TypeChip } from '../components';
+import { editionNumber } from '../lib/edition';
 
 interface Props {
   day: string;
@@ -22,10 +24,10 @@ export function CrosswordGame({ day, onDone, onBack }: Props) {
   );
   const [hints, setHints] = useState(saved?.hints ?? 0);
   const [sel, setSel] = useState<[number, number]>(() => {
-    const w = puzzle.words[0]!;
+    const w = puzzle.words.find((x) => x.type !== 'def') ?? puzzle.words[0]!;
     return [w.row, w.col];
   });
-  const [dir, setDir] = useState<Dir>('across');
+  const [dir, setDir] = useState<Dir>(() => (puzzle.words.find((x) => x.type !== 'def') ?? puzzle.words[0]!).dir);
   const [zoom, setZoom] = useState(false);
   const [toast, setToast] = useState('');
   const [popping, setPopping] = useState<Set<string>>(new Set());
@@ -170,49 +172,66 @@ export function CrosswordGame({ day, onDone, onBack }: Props) {
 
   const list = (d: Dir) => puzzle.words.filter((w) => w.dir === d).sort((a, b) => a.n - b.n);
 
+  const pct = Math.round((solved.size / puzzle.words.length) * 100);
+
   return (
-    <div className="game">
-      <header className="bar">
+    <div className="page game">
+      <header className="game-bar">
         <button className="link" onClick={onBack}>← Volver</button>
-        <strong>Crucigrama · {solved.size}/{puzzle.words.length}</strong>
+        <div className="game-title">
+          <small>Edición N.º {editionNumber(day)}</small>
+          <strong>El Críptico</strong>
+        </div>
         <span className="timer">{fmtTime(elapsed)}</span>
       </header>
+      <div className="progress" role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100}>
+        <div style={{ width: `${pct}%` }} />
+        <span>{solved.size} de {puzzle.words.length}</span>
+      </div>
 
       {toast && <div className="toast" role="status">{toast}</div>}
       <div className="clue-now">
         {active ? (
           <>
-            <b>{active.n} {activeDir === 'across' ? '→' : '↓'}</b> {active.clue} <span className="muted">({active.answer.length})</span>
+            <div className="clue-meta">
+              <b>{active.n} {activeDir === 'across' ? '→' : '↓'}</b>
+              <TypeChip t={active.type} />
+              <span className="muted">{active.answer.length} letras</span>
+            </div>
+            <p>{active.clue}</p>
           </>
-        ) : 'Tocá un casillero'}
+        ) : (
+          <p className="muted">Tocá un casillero para ver su consigna.</p>
+        )}
       </div>
 
       <div className="cw-scroll">
-      <div className="cw-grid" style={{ gridTemplateColumns: `repeat(${n}, 1fr)`, width: zoom ? `${n * 34}px` : '100%' }}>
-        {puzzle.cells.flatMap((row, r) =>
-          row.map((cell, c) => {
-            if (!cell) return <div key={`${r}-${c}`} className="cell blank" />;
-            const isSel = sel[0] === r && sel[1] === c;
-            const inWord = activeCells.some(([wr, wc]) => wr === r && wc === c);
-            return (
-              <button
-                key={`${r}-${c}`}
-                className={`cell${isSel ? ' sel' : inWord ? ' word' : ''}${locked.has(`${r},${c}`) ? ' solved' : ''}${popping.has(`${r},${c}`) ? ' pop' : ''}`}
-                onClick={() => tap(r, c)}
-                aria-label={`fila ${r + 1} columna ${c + 1}`}
-              >
-                {puzzle.numbers[r]![c] && <i>{puzzle.numbers[r]![c]}</i>}
-                <span>{letters[r]![c]}</span>
-              </button>
-            );
-          }),
-        )}
-      </div>
+        <div className="cw-grid" style={{ gridTemplateColumns: `repeat(${n}, 1fr)`, width: zoom ? `${n * 36}px` : '100%' }}>
+          {puzzle.cells.flatMap((row, r) =>
+            row.map((cell, c) => {
+              if (!cell) return <div key={`${r}-${c}`} className="cell blank" />;
+              const isSel = sel[0] === r && sel[1] === c;
+              const inWord = activeCells.some(([wr, wc]) => wr === r && wc === c);
+              const k = `${r},${c}`;
+              return (
+                <button
+                  key={`${r}-${c}`}
+                  className={`cell${isSel ? ' sel' : inWord ? ' word' : ''}${locked.has(k) ? ' solved' : ''}${popping.has(k) ? ' pop' : ''}`}
+                  onClick={() => tap(r, c)}
+                  aria-label={`fila ${r + 1} columna ${c + 1}`}
+                >
+                  {puzzle.numbers[r]![c] && <i>{puzzle.numbers[r]![c]}</i>}
+                  <span>{letters[r]![c]}</span>
+                </button>
+              );
+            }),
+          )}
+        </div>
       </div>
 
       <div className="actions">
-        <button className="btn" onClick={() => setZoom((z) => !z)}>🔍 {zoom ? 'Achicar' : 'Agrandar'}</button>
-        <button className="btn" onClick={hint}>💡 Pista (−{HINT_COST} pts)</button>
+        <button className="btn" onClick={() => setZoom((z) => !z)}>{zoom ? 'Achicar' : 'Agrandar'}</button>
+        <button className="btn" onClick={hint}>Pista · −{HINT_COST}</button>
         <button className="btn" onClick={() => setDir((d) => (d === 'across' ? 'down' : 'across'))}>
           Girar {activeDir === 'across' ? '↓' : '→'}
         </button>
@@ -224,7 +243,7 @@ export function CrosswordGame({ day, onDone, onBack }: Props) {
             {row.split('').map((k) => (
               <button key={k} onClick={() => type(k)}>{k}</button>
             ))}
-            {i === 2 && <button className="wide" onClick={erase}>⌫</button>}
+            {i === 2 && <button className="wide" onClick={erase} aria-label="Borrar">⌫</button>}
           </div>
         ))}
       </div>
@@ -239,7 +258,10 @@ export function CrosswordGame({ day, onDone, onBack }: Props) {
                 className={`clue${active === w ? ' on' : ''}${solved.has(wordKey(w)) ? ' solved' : ''}`}
                 onClick={() => pickClue(w)}
               >
-                <b>{solved.has(wordKey(w)) ? '✓' : w.n}</b> {w.clue} <span className="muted">({w.answer.length})</span>
+                <b>{solved.has(wordKey(w)) ? '✓' : w.n}</b>
+                <span>
+                  {w.clue} <span className="muted">({w.answer.length})</span>
+                </span>
               </button>
             ))}
           </section>

@@ -38,6 +38,7 @@ describe('crossword', () => {
       expect(across).toBeGreaterThanOrEqual(13);
       expect(x.words.length - across).toBeGreaterThanOrEqual(13);
       expect(x.size).toBeLessThanOrEqual(19);
+      expect(x.words.filter((w) => w.type !== 'def').length).toBeGreaterThanOrEqual(14);
     }
   });
 });

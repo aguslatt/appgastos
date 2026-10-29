@@ -2,6 +2,7 @@ import { useMemo, useRef, useState } from 'react';
 import { buildWordSearch } from '../lib/wordsearch';
 import { fmtTime, score } from '../lib/scoring';
 import { useGameClock } from '../hooks';
+import { editionNumber } from '../lib/edition';
 
 interface Props {
   day: string;
@@ -81,13 +82,20 @@ export function WordSearchGame({ day, onDone, onBack }: Props) {
   };
 
   return (
-    <div className="game">
-      <header className="bar">
+    <div className="page game">
+      <header className="game-bar">
         <button className="link" onClick={onBack}>← Volver</button>
-        <strong>Sopa de letras</strong>
+        <div className="game-title">
+          <small>Edición N.º {editionNumber(day)}</small>
+          <strong>La Sopa</strong>
+        </div>
         <span className="timer">{fmtTime(elapsed)}</span>
       </header>
-      <p className="muted center">Encontrá la palabra que responde a cada pista. Arrastrá el dedo sobre ella, en cualquier dirección, también al revés. {found.length}/{puzzle.words.length}</p>
+      <div className="progress" role="progressbar" aria-valuenow={found.length} aria-valuemin={0} aria-valuemax={puzzle.words.length}>
+        <div style={{ width: `${(found.length / puzzle.words.length) * 100}%` }} />
+        <span>{found.length} de {puzzle.words.length}</span>
+      </div>
+      <p className="muted center">Cada pista esconde una palabra. Arrastrá el dedo sobre ella, en cualquier dirección.</p>
 
       {toast && <div className="toast" role="status">{toast}</div>}
       <div
@@ -114,11 +122,15 @@ export function WordSearchGame({ day, onDone, onBack }: Props) {
       </div>
 
       <ul className="ws-words">
-        {puzzle.words.map((w) => (
-          <li key={w.answer} className={found.includes(w.answer) ? 'done' : ''}>
-            {found.includes(w.answer) ? `✓ ${w.answer}` : `${w.clue} (${w.answer.length})`}
-          </li>
-        ))}
+        {puzzle.words.map((w) => {
+          const ok = found.includes(w.answer);
+          return (
+            <li key={w.answer} className={ok ? 'done' : ''}>
+              <b>{ok ? '✓' : '?'}</b>
+              <span>{ok ? w.answer : `${w.clue} (${w.answer.length})`}</span>
+            </li>
+          );
+        })}
       </ul>
     </div>
   );

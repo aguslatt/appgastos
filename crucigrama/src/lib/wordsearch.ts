@@ -18,7 +18,7 @@ const ALPHABET = 'AEIOSRNDLCTUMPBGVFHQJZXYK';
 export function buildWordSearch(seed: string): WordSearch {
   const rnd = mulberry32(hash(seed));
   const pool = shuffle(
-    BANK.filter((e) => e.a.length >= 5 && e.a.length <= 10),
+    BANK.filter((e) => e.a.length >= 5 && e.a.length <= 10 && (e.t === 'def' || e.t === 'doble')),
     rnd,
   );
   const grid: (string | null)[][] = Array.from({ length: SIZE }, () => Array<string | null>(SIZE).fill(null));

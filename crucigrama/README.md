@@ -14,9 +14,13 @@ Crucigrama y sopa de letras **nuevos cada día**, con cultura argentina, para ju
     npm test        # tests
     npm run build   # versión para publicar (carpeta dist/)
 
+## Tipos de consigna
+
+El crucigrama es "críptico": cada consigna dice de qué tipo es. **Anagrama** (`Revolvé «TEMA»` → MATE), **Escondida** (la respuesta está dentro de una frase), **Suma** (dos palabras que se juntan), **Doble** (dos significados) y **Definición**.
+
 ## Sumar tus propias pistas
 
-Editá `src/lib/bank.ts`: cada entrada es `{ a: 'RESPUESTA', c: 'Pista' }` (mayúsculas, sin tildes ni espacios ni Ñ). Cosas que sepan ustedes dos entran solas en los juegos.
+Editá `src/lib/bank.ts`: cada entrada es `{ a: 'RESPUESTA', c: 'Pista', t: 'def' }` (`t` es el tipo: anag, oculta, suma, doble o def) (mayúsculas, sin tildes ni espacios ni Ñ). Cosas que sepan ustedes dos entran solas en los juegos.
 
 ## Ranking en vivo con tu novio (Supabase, gratis)
 
