@@ -1,9 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { buildCrossword, wordCells, type Dir, type Placed } from '../lib/crossword';
-import { HINT_COST, fmtTime, score } from '../lib/scoring';
+import { HINT_COST, fmtTime, longDate, score } from '../lib/scoring';
 import { useGameClock } from '../hooks';
-import { TypeChip } from '../components';
-import { editionNumber } from '../lib/edition';
+import { Icon } from '../components';
 
 interface Props {
   day: string;
@@ -24,12 +23,13 @@ export function CrosswordGame({ day, onDone, onBack }: Props) {
   );
   const [hints, setHints] = useState(saved?.hints ?? 0);
   const [sel, setSel] = useState<[number, number]>(() => {
-    const w = puzzle.words.find((x) => x.type !== 'def') ?? puzzle.words[0]!;
+    const w = puzzle.words[0]!;
     return [w.row, w.col];
   });
-  const [dir, setDir] = useState<Dir>(() => (puzzle.words.find((x) => x.type !== 'def') ?? puzzle.words[0]!).dir);
+  const [dir, setDir] = useState<Dir>(() => puzzle.words[0]!.dir);
   const [zoom, setZoom] = useState(false);
   const [toast, setToast] = useState('');
+  const [tab, setTab] = useState<Dir>('across');
   const [popping, setPopping] = useState<Set<string>>(new Set());
 
   const wordKey = (w: Placed) => `${w.n}${w.dir}`;
@@ -177,25 +177,24 @@ export function CrosswordGame({ day, onDone, onBack }: Props) {
   return (
     <div className="page game">
       <header className="game-bar">
-        <button className="link" onClick={onBack}>← Volver</button>
+        <button className="icon-btn" onClick={onBack} aria-label="Volver"><Icon name="back" /></button>
         <div className="game-title">
-          <small>Edición N.º {editionNumber(day)}</small>
-          <strong>El Críptico</strong>
+          <strong>Crucigrama</strong>
+          <small>{longDate(day)}</small>
         </div>
         <span className="timer">{fmtTime(elapsed)}</span>
       </header>
       <div className="progress" role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100}>
         <div style={{ width: `${pct}%` }} />
-        <span>{solved.size} de {puzzle.words.length}</span>
       </div>
+      <p className="progress-label">{solved.size} de {puzzle.words.length} palabras</p>
 
       {toast && <div className="toast" role="status">{toast}</div>}
       <div className="clue-now">
         {active ? (
           <>
             <div className="clue-meta">
-              <b>{active.n} {activeDir === 'across' ? '→' : '↓'}</b>
-              <TypeChip t={active.type} />
+              <span className="pill">{active.n} {activeDir === 'across' ? 'Horizontal' : 'Vertical'}</span>
               <span className="muted">{active.answer.length} letras</span>
             </div>
             <p>{active.clue}</p>
@@ -206,7 +205,7 @@ export function CrosswordGame({ day, onDone, onBack }: Props) {
       </div>
 
       <div className="cw-scroll">
-        <div className="cw-grid" style={{ gridTemplateColumns: `repeat(${n}, 1fr)`, width: zoom ? `${n * 36}px` : '100%' }}>
+        <div className="cw-grid" style={{ gridTemplateColumns: `repeat(${n}, 1fr)`, width: zoom ? `${n * 38}px` : '100%' }}>
           {puzzle.cells.flatMap((row, r) =>
             row.map((cell, c) => {
               if (!cell) return <div key={`${r}-${c}`} className="cell blank" />;
@@ -230,10 +229,10 @@ export function CrosswordGame({ day, onDone, onBack }: Props) {
       </div>
 
       <div className="actions">
-        <button className="btn" onClick={() => setZoom((z) => !z)}>{zoom ? 'Achicar' : 'Agrandar'}</button>
-        <button className="btn" onClick={hint}>Pista · −{HINT_COST}</button>
-        <button className="btn" onClick={() => setDir((d) => (d === 'across' ? 'down' : 'across'))}>
-          Girar {activeDir === 'across' ? '↓' : '→'}
+        <button className="chip-btn" onClick={() => setZoom((z) => !z)}><Icon name="zoom" /> {zoom ? 'Achicar' : 'Agrandar'}</button>
+        <button className="chip-btn" onClick={hint}><Icon name="bulb" /> Pista <small>−{HINT_COST}</small></button>
+        <button className="chip-btn" onClick={() => setDir((d) => (d === 'across' ? 'down' : 'across'))}>
+          <Icon name="swap" /> {activeDir === 'across' ? 'Vertical' : 'Horizontal'}
         </button>
       </div>
 
@@ -243,30 +242,33 @@ export function CrosswordGame({ day, onDone, onBack }: Props) {
             {row.split('').map((k) => (
               <button key={k} onClick={() => type(k)}>{k}</button>
             ))}
-            {i === 2 && <button className="wide" onClick={erase} aria-label="Borrar">⌫</button>}
+            {i === 2 && <button className="wide" onClick={erase} aria-label="Borrar"><Icon name="delete" /></button>}
           </div>
         ))}
       </div>
 
-      <div className="clues">
-        {(['across', 'down'] as const).map((d) => (
-          <section key={d}>
-            <h3>{d === 'across' ? 'Horizontales →' : 'Verticales ↓'}</h3>
-            {list(d).map((w) => (
-              <button
-                key={`${w.n}${d}`}
-                className={`clue${active === w ? ' on' : ''}${solved.has(wordKey(w)) ? ' solved' : ''}`}
-                onClick={() => pickClue(w)}
-              >
-                <b>{solved.has(wordKey(w)) ? '✓' : w.n}</b>
-                <span>
-                  {w.clue} <span className="muted">({w.answer.length})</span>
-                </span>
-              </button>
-            ))}
-          </section>
+      <section className="clues">
+        <div className="segmented" role="tablist">
+          {(['across', 'down'] as const).map((d) => (
+            <button key={d} role="tab" aria-selected={tab === d} className={tab === d ? 'on' : ''} onClick={() => setTab(d)}>
+              {d === 'across' ? 'Horizontales' : 'Verticales'}
+              <small>{list(d).filter((w) => solved.has(wordKey(w))).length}/{list(d).length}</small>
+            </button>
+          ))}
+        </div>
+        {list(tab).map((w) => (
+          <button
+            key={`${w.n}${tab}`}
+            className={`clue${active === w ? ' on' : ''}${solved.has(wordKey(w)) ? ' solved' : ''}`}
+            onClick={() => { pickClue(w); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+          >
+            <b>{solved.has(wordKey(w)) ? <Icon name="check" /> : w.n}</b>
+            <span>
+              {w.clue} <span className="muted">({w.answer.length})</span>
+            </span>
+          </button>
         ))}
-      </div>
+      </section>
     </div>
   );
 }

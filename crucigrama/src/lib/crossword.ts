@@ -1,4 +1,4 @@
-import { BANK, type ClueType, type Entry } from './bank';
+import { BANK, type Entry } from './bank';
 import { hash, mulberry32, shuffle } from './rng';
 
 export type Dir = 'across' | 'down';
@@ -10,7 +10,6 @@ export interface Placed {
   col: number;
   answer: string;
   clue: string;
-  type: ClueType;
 }
 
 export interface Crossword {
@@ -21,7 +20,7 @@ export interface Crossword {
 }
 
 const SIZE = 19;
-const ATTEMPTS = 80;
+const ATTEMPTS = 60;
 const TARGET = 30; // ~15 horizontales y ~15 verticales
 const MAX_WORDS = 32;
 
@@ -74,16 +73,12 @@ function place(d: Draft, e: Entry, row: number, col: number, dir: Dir) {
     d.letters[r]![c] = e.a[i]!;
     d.dirs[r]![c] = d.dirs[r]![c] ? 'both' : dir;
   }
-  d.words.push({ dir, row, col, answer: e.a, clue: e.c, type: e.t });
+  d.words.push({ dir, row, col, answer: e.a, clue: e.c });
 }
 
 function attempt(pool: Entry[], rnd: () => number): Draft {
   const d = emptyDraft();
-  // Las consignas con truco entran primero: cuentan más para el armado.
-  const trick = (e: Entry) => (e.t === 'def' ? 0 : 1);
-  const queue = shuffle(pool, rnd).sort(
-    (a, b) => b.a.length - a.a.length + (trick(b) - trick(a)) * 5 + (rnd() - 0.5) * 4,
-  );
+  const queue = shuffle(pool, rnd).sort((a, b) => b.a.length - a.a.length + (rnd() - 0.5) * 4);
   const first = queue.find((e) => e.a.length >= 7 && e.a.length <= SIZE) ?? queue[0]!;
   place(d, first, Math.floor(SIZE / 2), Math.floor((SIZE - first.a.length) / 2), 'across');
   // Dos pasadas: lo que no entró al principio puede entrar cuando hay más cruces.
@@ -115,19 +110,14 @@ function attempt(pool: Entry[], rnd: () => number): Draft {
 /** Cantidad de palabras, premiando que haya parecidas horizontales y verticales. */
 function balanced(d: Draft): number {
   const across = d.words.filter((w) => w.dir === 'across').length;
-  const tricky = d.words.filter((w) => w.type !== 'def').length;
-  return d.words.length - Math.abs(across - (d.words.length - across)) * 0.5 + tricky * 0.1;
+  return d.words.length - Math.abs(across - (d.words.length - across)) * 0.5;
 }
 
 export function buildCrossword(seed: string, bank: Entry[] = BANK): Crossword {
   const rnd = mulberry32(hash(seed));
   // Elegimos un grupo de ~70 entradas por día para tener variedad.
-  // Cada día sortea un subconjunto distinto: unas 45 con truco y el resto definiciones.
-  const usable = bank.filter((e) => e.a.length >= 3);
-  const pool = [
-    ...shuffle(usable.filter((e) => e.t !== 'def'), rnd).slice(0, 45),
-    ...shuffle(usable.filter((e) => e.t === 'def'), rnd).slice(0, 110),
-  ];
+  // Cada día sortea un subconjunto distinto del banco.
+  const pool = shuffle(bank.filter((e) => e.a.length >= 3), rnd).slice(0, 170);
   let best = attempt(pool, rnd);
   for (let i = 1; i < ATTEMPTS; i++) {
     const d = attempt(pool, rnd);

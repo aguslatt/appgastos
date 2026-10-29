@@ -1,8 +1,7 @@
-export type GameKind = 'crossword' | 'wordsearch';
+export type GameKind = 'crossword';
 
 export const GAMES: Record<GameKind, { label: string; base: number; par: number }> = {
   crossword: { label: 'Crucigrama', base: 150, par: 1800 }, // 30 min de referencia
-  wordsearch: { label: 'Sopa de letras', base: 60, par: 420 }, // 7 min
 };
 
 export const HINT_COST = 8;
@@ -33,5 +32,20 @@ export function weekStart(day: string): string {
   const d = new Date(day + 'T12:00:00');
   const back = (d.getDay() + 6) % 7;
   d.setDate(d.getDate() - back);
+  return dayKey(d);
+}
+
+export function longDate(day: string): string {
+  const s = new Date(day + 'T12:00:00').toLocaleDateString('es', { weekday: 'long', day: 'numeric', month: 'long' });
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+export function shortWeekday(day: string): string {
+  return new Date(day + 'T12:00:00').toLocaleDateString('es', { weekday: 'narrow' }).toUpperCase();
+}
+
+export function addDays(day: string, n: number): string {
+  const d = new Date(day + 'T12:00:00');
+  d.setDate(d.getDate() + n);
   return dayKey(d);
 }
