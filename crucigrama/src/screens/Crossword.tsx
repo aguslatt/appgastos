@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { buildCrossword, wordCells, type Dir, type Placed } from '../lib/crossword';
-import { HINT_COST, fmtTime, longDate, score } from '../lib/scoring';
+import { HINT_COST, fmtTime, score } from '../lib/scoring';
 import { useGameClock } from '../hooks';
-import { Icon } from '../components';
+import { Icon, Tile } from '../components';
+import { isMuted, play, setMuted } from '../lib/sound';
 
 interface Props {
   day: string;
@@ -31,6 +32,7 @@ export function CrosswordGame({ day, onDone, onBack }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [toast, setToast] = useState('');
   const [tab, setTab] = useState<Dir>('across');
+  const [muted, setMutedState] = useState(isMuted);
   const [popping, setPopping] = useState<Set<string>>(new Set());
 
   const wordKey = (w: Placed) => `${w.n}${w.dir}`;
@@ -66,7 +68,8 @@ export function CrosswordGame({ day, onDone, onBack }: Props) {
     const cells = new Set<string>();
     for (const w of fresh) for (const [r, c] of wordCells(w)) cells.add(`${r},${c}`);
     setPopping(cells);
-    setToast(`¡Bien! ${fresh[0]!.answer}`);
+    setToast(fresh[0]!.answer);
+    play('ok');
     try { navigator.vibrate?.(40); } catch { /* sin vibración */ }
     const t1 = setTimeout(() => setPopping(new Set()), 700);
     const t2 = setTimeout(() => setToast(''), 1600);
@@ -93,6 +96,7 @@ export function CrosswordGame({ day, onDone, onBack }: Props) {
       for (let c = 0; c < n; c++) if (puzzle.cells[r]![c] && grid[r]![c] !== puzzle.cells[r]![c]) return;
     }
     setFinished(true);
+    play('win');
     onDone(elapsed, score('crossword', elapsed, hints));
   };
 
@@ -123,13 +127,18 @@ export function CrosswordGame({ day, onDone, onBack }: Props) {
     setLetters(grid);
   };
   const hint = () => {
-    const [r, c] = sel;
-    if (finished || letters[r]![c] === puzzle.cells[r]![c]) return;
+    if (finished) return;
+    const wrong = (r: number, c: number) => letters[r]![c] !== puzzle.cells[r]![c];
+    // Revela el casillero elegido si está mal; si no, la primera letra que falte de la palabra.
+    const target = wrong(sel[0], sel[1]) ? sel : activeCells.find(([r, c]) => wrong(r, c));
+    if (!target) return;
+    const [r, c] = target;
     const grid = letters.map((row) => row.slice());
     grid[r]![c] = puzzle.cells[r]![c]!;
     setLetters(grid);
     setHints((h) => h + 1);
-    advance(r, c);
+    const next = activeCells.find(([wr, wc]) => (wr !== r || wc !== c) && grid[wr]![wc] !== puzzle.cells[wr]![wc]);
+    if (next) setSel(next);
     check(grid);
   };
 
@@ -190,24 +199,30 @@ export function CrosswordGame({ day, onDone, onBack }: Props) {
   return (
     <div className="page game">
       <header className="game-bar">
-        <button className="icon-btn" onClick={onBack} aria-label="Volver"><Icon name="back" /></button>
-        <div className="game-title">
-          <strong>Crucigrama</strong>
-          <small>{longDate(day)}</small>
+        <button className="icon-btn" onClick={onBack} aria-label="Salir"><Icon name="close" /></button>
+        <div className="progress" role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100}>
+          <div style={{ width: `${Math.max(pct, 4)}%` }} />
         </div>
-        <span className="timer">{fmtTime(elapsed)}</span>
+        <button className="icon-btn" onClick={() => { setMuted(!muted); setMutedState(!muted); }} aria-label={muted ? 'Activar sonido' : 'Silenciar'}>
+          <Icon name={muted ? 'mute' : 'sound'} size={20} />
+        </button>
       </header>
-      <div className="progress" role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100}>
-        <div style={{ width: `${pct}%` }} />
+      <div className="game-sub">
+        <span><b>{solved.size}</b> de {puzzle.words.length} palabras</span>
+        <span className="timer"><Icon name="clock" size={16} /> {fmtTime(elapsed)}</span>
       </div>
-      <p className="progress-label">{solved.size} de {puzzle.words.length} palabras</p>
 
-      {toast && <div className="toast" role="status">{toast}</div>}
+      {toast && (
+        <div className="banner" role="status">
+          <Tile name="Cruci" color="var(--go)" size={52} mood="cheer" />
+          <div><strong>¡Muy bien!</strong><span>{toast}</span></div>
+        </div>
+      )}
       <div className="clue-now">
         {active ? (
           <>
             <div className="clue-meta">
-              <span className="pill">{active.n} {activeDir === 'across' ? 'Horizontal' : 'Vertical'}</span>
+              <span className="pill">{active.n} · {activeDir === 'across' ? 'Horizontal' : 'Vertical'}</span>
               <span className="muted">{active.answer.length} letras</span>
             </div>
             <p>{active.clue}</p>
@@ -218,7 +233,14 @@ export function CrosswordGame({ day, onDone, onBack }: Props) {
       </div>
 
       <div className="cw-scroll" ref={scrollRef}>
-        <div className={`cw-grid${zoom ? ' big' : ''}`} style={{ gridTemplateColumns: `repeat(${n}, 1fr)`, width: zoom ? `${n * 34}px` : '100%' }}>
+        <div
+          className={`cw-grid${zoom ? ' big' : ''}`}
+          style={{
+            ['--cs' as string]: zoom ? '34px' : `calc((100cqw - ${(n - 1) * 3}px) / ${n})`,
+            gridTemplateColumns: `repeat(${n}, var(--cs))`,
+            gridAutoRows: 'var(--cs)',
+          }}
+        >
           {puzzle.cells.flatMap((row, r) =>
             row.map((cell, c) => {
               if (!cell) return <div key={`${r}-${c}`} className="cell blank" />;
