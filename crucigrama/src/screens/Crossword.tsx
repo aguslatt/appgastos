@@ -27,7 +27,8 @@ export function CrosswordGame({ day, onDone, onBack }: Props) {
     return [w.row, w.col];
   });
   const [dir, setDir] = useState<Dir>(() => puzzle.words[0]!.dir);
-  const [zoom, setZoom] = useState(false);
+  const [zoom, setZoom] = useState(true);
+  const scrollRef = useRef<HTMLDivElement>(null);
   const [toast, setToast] = useState('');
   const [tab, setTab] = useState<Dir>('across');
   const [popping, setPopping] = useState<Set<string>>(new Set());
@@ -172,6 +173,18 @@ export function CrosswordGame({ day, onDone, onBack }: Props) {
 
   const list = (d: Dir) => puzzle.words.filter((w) => w.dir === d).sort((a, b) => a.n - b.n);
 
+  // Con la grilla agrandada, el scroll acompaña al casillero elegido.
+  useEffect(() => {
+    const box = scrollRef.current;
+    const el = box?.querySelector<HTMLElement>(`[data-rc="${sel[0]},${sel[1]}"]`);
+    if (!box || !el || !zoom) return;
+    box.scrollTo({
+      left: el.offsetLeft - box.clientWidth / 2 + el.offsetWidth / 2,
+      top: el.offsetTop - box.clientHeight / 2 + el.offsetHeight / 2,
+      behavior: 'smooth',
+    });
+  }, [sel, zoom]);
+
   const pct = Math.round((solved.size / puzzle.words.length) * 100);
 
   return (
@@ -204,8 +217,8 @@ export function CrosswordGame({ day, onDone, onBack }: Props) {
         )}
       </div>
 
-      <div className="cw-scroll">
-        <div className="cw-grid" style={{ gridTemplateColumns: `repeat(${n}, 1fr)`, width: zoom ? `${n * 38}px` : '100%' }}>
+      <div className="cw-scroll" ref={scrollRef}>
+        <div className={`cw-grid${zoom ? ' big' : ''}`} style={{ gridTemplateColumns: `repeat(${n}, 1fr)`, width: zoom ? `${n * 34}px` : '100%' }}>
           {puzzle.cells.flatMap((row, r) =>
             row.map((cell, c) => {
               if (!cell) return <div key={`${r}-${c}`} className="cell blank" />;
@@ -215,6 +228,7 @@ export function CrosswordGame({ day, onDone, onBack }: Props) {
               return (
                 <button
                   key={`${r}-${c}`}
+                  data-rc={k}
                   className={`cell${isSel ? ' sel' : inWord ? ' word' : ''}${locked.has(k) ? ' solved' : ''}${popping.has(k) ? ' pop' : ''}`}
                   onClick={() => tap(r, c)}
                   aria-label={`fila ${r + 1} columna ${c + 1}`}
@@ -229,7 +243,7 @@ export function CrosswordGame({ day, onDone, onBack }: Props) {
       </div>
 
       <div className="actions">
-        <button className="chip-btn" onClick={() => setZoom((z) => !z)}><Icon name="zoom" /> {zoom ? 'Achicar' : 'Agrandar'}</button>
+        <button className="chip-btn" onClick={() => setZoom((z) => !z)}><Icon name="zoom" /> {zoom ? 'Ver todo' : 'Agrandar'}</button>
         <button className="chip-btn" onClick={hint}><Icon name="bulb" /> Pista <small>−{HINT_COST}</small></button>
         <button className="chip-btn" onClick={() => setDir((d) => (d === 'across' ? 'down' : 'across'))}>
           <Icon name="swap" /> {activeDir === 'across' ? 'Vertical' : 'Horizontal'}
