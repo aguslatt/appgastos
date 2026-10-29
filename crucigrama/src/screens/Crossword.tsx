@@ -26,6 +26,7 @@ export function CrosswordGame({ day, onDone, onBack }: Props) {
     return [w.row, w.col];
   });
   const [dir, setDir] = useState<Dir>('across');
+  const [zoom, setZoom] = useState(false);
 
   const wordAt = useCallback(
     (r: number, c: number, d: Dir): Placed | undefined =>
@@ -139,7 +140,8 @@ export function CrosswordGame({ day, onDone, onBack }: Props) {
         ) : 'Tocá un casillero'}
       </div>
 
-      <div className="cw-grid" style={{ gridTemplateColumns: `repeat(${n}, 1fr)` }}>
+      <div className="cw-scroll">
+      <div className="cw-grid" style={{ gridTemplateColumns: `repeat(${n}, 1fr)`, width: zoom ? `${n * 34}px` : '100%' }}>
         {puzzle.cells.flatMap((row, r) =>
           row.map((cell, c) => {
             if (!cell) return <div key={`${r}-${c}`} className="cell blank" />;
@@ -159,8 +161,10 @@ export function CrosswordGame({ day, onDone, onBack }: Props) {
           }),
         )}
       </div>
+      </div>
 
       <div className="actions">
+        <button className="btn" onClick={() => setZoom((z) => !z)}>🔍 {zoom ? 'Achicar' : 'Agrandar'}</button>
         <button className="btn" onClick={hint}>💡 Pista (−{HINT_COST} pts)</button>
         <button className="btn" onClick={() => setDir((d) => (d === 'across' ? 'down' : 'across'))}>
           Girar {activeDir === 'across' ? '↓' : '→'}

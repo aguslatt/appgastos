@@ -25,7 +25,7 @@ describe('crossword', () => {
     const a = buildCrossword('2026-10-29');
     const b = buildCrossword('2026-10-29');
     expect(a).toEqual(b);
-    expect(a.words.length).toBeGreaterThanOrEqual(9);
+    expect(a.words.length).toBeGreaterThanOrEqual(30);
     for (const w of a.words) {
       wordCells(w).forEach(([r, c], i) => expect(a.cells[r]![c]).toBe(w.answer[i]));
     }
@@ -33,8 +33,11 @@ describe('crossword', () => {
   it('arma grillas compactas en muchos días', () => {
     for (let d = 1; d <= 28; d++) {
       const x = buildCrossword(`2026-11-${String(d).padStart(2, '0')}`);
-      expect(x.words.length).toBeGreaterThanOrEqual(8);
-      expect(x.size).toBeLessThanOrEqual(13);
+      const across = x.words.filter((w) => w.dir === 'across').length;
+      expect(x.words.length).toBeGreaterThanOrEqual(30);
+      expect(across).toBeGreaterThanOrEqual(13);
+      expect(x.words.length - across).toBeGreaterThanOrEqual(13);
+      expect(x.size).toBeLessThanOrEqual(19);
     }
   });
 });

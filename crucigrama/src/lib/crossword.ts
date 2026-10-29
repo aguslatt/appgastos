@@ -19,9 +19,10 @@ export interface Crossword {
   words: Placed[];
 }
 
-const SIZE = 13;
-const ATTEMPTS = 60;
-const MAX_WORDS = 14;
+const SIZE = 19;
+const ATTEMPTS = 80;
+const TARGET = 30; // ~15 horizontales y ~15 verticales
+const MAX_WORDS = 32;
 
 interface Draft {
   letters: (string | null)[][];
@@ -80,7 +81,8 @@ function attempt(pool: Entry[], rnd: () => number): Draft {
   const queue = shuffle(pool, rnd).sort((a, b) => b.a.length - a.a.length + (rnd() - 0.5) * 4);
   const first = queue.find((e) => e.a.length >= 7 && e.a.length <= SIZE) ?? queue[0]!;
   place(d, first, Math.floor(SIZE / 2), Math.floor((SIZE - first.a.length) / 2), 'across');
-  for (const e of queue) {
+  // Dos pasadas: lo que no entró al principio puede entrar cuando hay más cruces.
+  for (const e of [...queue, ...queue]) {
     if (d.words.length >= MAX_WORDS) break;
     if (d.words.some((w) => w.answer === e.a)) continue;
     const options: [number, number, Dir, number][] = [];
@@ -93,21 +95,33 @@ function attempt(pool: Entry[], rnd: () => number): Draft {
       }
     }
     if (!options.length) continue;
-    options.sort((a, b) => b[3] - a[3] + (rnd() - 0.5) * 1.5);
+    const across = d.words.filter((w) => w.dir === 'across').length;
+    const down = d.words.length - across;
+    const want: Dir = across > down ? 'down' : 'across';
+    options.sort(
+      (a, b) => b[3] + (b[2] === want ? 1.5 : 0) - (a[3] + (a[2] === want ? 1.5 : 0)) + (rnd() - 0.5) * 1.5,
+    );
     const [r, c, dir] = options[0]!;
     place(d, e, r, c, dir);
   }
   return d;
 }
 
+/** Cantidad de palabras, premiando que haya parecidas horizontales y verticales. */
+function balanced(d: Draft): number {
+  const across = d.words.filter((w) => w.dir === 'across').length;
+  return d.words.length - Math.abs(across - (d.words.length - across)) * 0.5;
+}
+
 export function buildCrossword(seed: string, bank: Entry[] = BANK): Crossword {
   const rnd = mulberry32(hash(seed));
   // Elegimos un grupo de ~70 entradas por día para tener variedad.
-  const pool = shuffle(bank, rnd).slice(0, 70);
+  const pool = shuffle(bank.filter((e) => e.a.length >= 3), rnd);
   let best = attempt(pool, rnd);
   for (let i = 1; i < ATTEMPTS; i++) {
     const d = attempt(pool, rnd);
-    if (d.words.length > best.words.length) best = d;
+    if (balanced(d) > balanced(best)) best = d;
+    if (best.words.length >= TARGET && balanced(best) >= TARGET - 1) break;
   }
 
   // Recortamos a la caja que ocupa para que la grilla sea compacta.

@@ -1,7 +1,7 @@
 export type GameKind = 'crossword' | 'wordsearch';
 
 export const GAMES: Record<GameKind, { label: string; base: number; par: number }> = {
-  crossword: { label: 'Crucigrama', base: 100, par: 900 }, // 15 min de referencia
+  crossword: { label: 'Crucigrama', base: 150, par: 1800 }, // 30 min de referencia
   wordsearch: { label: 'Sopa de letras', base: 60, par: 420 }, // 7 min
 };
 

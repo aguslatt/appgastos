@@ -2,8 +2,9 @@
 
 Crucigrama y sopa de letras **nuevos cada día**, con cultura argentina, para jugar en el celu o la compu y competir por tiempo y puntos.
 
+- **Crucigrama grande**: ~30 palabras por día (unas 15 horizontales y 15 verticales) en una grilla de hasta 19×19, con botón de zoom en el celu.
 - **Mismo juego para los dos**: el puzzle sale de la fecha, así que ambos reciben el mismo sin servidor.
-- **Puntos**: crucigrama 100 y sopa 60, más hasta +50% por velocidad; cada pista resta 8. Ranking semanal (lunes a domingo) y total.
+- **Puntos**: crucigrama 150 y sopa 60, más hasta +50% por velocidad; cada pista resta 8. Ranking semanal (lunes a domingo) y total.
 - **Se instala** en el celu (PWA) y guarda tu progreso si cerrás la app.
 
 ## Correr
