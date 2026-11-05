@@ -2,115 +2,56 @@ import React, {useMemo} from 'react';
 import {AbsoluteFill, Easing, Img, spring, staticFile, useCurrentFrame} from 'remotion';
 import {COLORS, FPS, TEXTOS} from './config';
 import {FONT} from './fonts';
+import data from './mapdata.json';
 import {prog} from './util';
 
-// Silueta ESTILIZADA de Capital Federal (lon, lat). No es cartográficamente exacta.
-const POLY: [number, number][] = [
-  [-58.465, -34.528], [-58.443, -34.539], [-58.416, -34.559], [-58.39, -34.578], [-58.37, -34.594],
-  [-58.352, -34.612], [-58.346, -34.619], [-58.353, -34.63], [-58.36, -34.633], [-58.379, -34.648],
-  [-58.401, -34.656], [-58.418, -34.669], [-58.445, -34.677], [-58.47, -34.693], [-58.499, -34.699],
-  [-58.515, -34.672], [-58.531, -34.652], [-58.532, -34.625], [-58.53, -34.605], [-58.513, -34.59],
-  [-58.505, -34.576], [-58.49, -34.556],
-];
-
-const MAP_H = 940;
-const LAT_TOP = -34.5265;
-const LAT_BOT = -34.7;
-const LON_W = -58.5325;
-const COS = Math.cos((34.61 * Math.PI) / 180);
-const K = MAP_H / (LAT_TOP - LAT_BOT);
-const MAP_W = (-58.345 - LON_W) * COS * K;
+// Datos reales de CABA (radios censales INDEC/GCBA, ver scripts/build_map.py).
+// Los 150 puntos son posiciones SIMULADAS (ponderadas por población), no locales reales.
+const MAP_W = data.w;
+const MAP_H = data.h;
 const OX = 1390 - MAP_W / 2;
 const OY = (1080 - MAP_H) / 2;
-const proj = ([lon, lat]: [number, number]): [number, number] => [
-  OX + (lon - LON_W) * COS * K,
-  OY + (LAT_TOP - lat) * K,
-];
-const PTS = POLY.map(proj);
 const CENTER: [number, number] = [OX + MAP_W / 2, 540];
+const dotsAbs: [number, number][] = data.dots.map(([x, y]) => [OX + x, OY + y]);
 
-const outlinePath = () => {
-  const n = PTS.length;
-  const mid = (a: number[], b: number[]) => [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
-  const m0 = mid(PTS[n - 1], PTS[0]);
-  let d = `M${m0[0]},${m0[1]}`;
-  for (let i = 0; i < n; i++) {
-    const m = mid(PTS[i], PTS[(i + 1) % n]);
-    d += ` Q${PTS[i][0]},${PTS[i][1]} ${m[0]},${m[1]}`;
+// orden de aparición (determinístico, repartido por toda la ciudad)
+const order = (() => {
+  let seed = 5;
+  const r = () => {
+    seed = (seed + 0x6d2b79f5) | 0;
+    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+  const a = dotsAbs.map((_, i) => i);
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(r() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
   }
-  return d + 'Z';
-};
-
-const inside = (x: number, y: number) => {
-  let c = false;
-  for (let i = 0, j = PTS.length - 1; i < PTS.length; j = i++) {
-    const [xi, yi] = PTS[i];
-    const [xj, yj] = PTS[j];
-    if (yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) c = !c;
-  }
-  return c;
-};
-const edgeDist = (x: number, y: number) => {
-  let m = 1e9;
-  for (let i = 0; i < PTS.length; i++) {
-    const [ax, ay] = PTS[i];
-    const [bx, by] = PTS[(i + 1) % PTS.length];
-    const t = Math.max(0, Math.min(1, ((x - ax) * (bx - ax) + (y - ay) * (by - ay)) / ((bx - ax) ** 2 + (by - ay) ** 2)));
-    m = Math.min(m, Math.hypot(x - (ax + t * (bx - ax)), y - (ay + t * (by - ay))));
-  }
-  return m;
-};
-const rng = (seed: number) => () => {
-  seed = (seed + 0x6d2b79f5) | 0;
-  let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
-  t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-  return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-};
-
-// 150 posiciones simuladas (determinísticas), separadas entre sí.
-const makeDots = (n: number) => {
-  const r = rng(11);
-  const dots: [number, number][] = [];
-  let guard = 0;
-  while (dots.length < n && guard++ < 200000) {
-    const x = OX + r() * MAP_W;
-    const y = OY + r() * MAP_H;
-    if (!inside(x, y) || edgeDist(x, y) < 18) continue;
-    if (dots.some(([a, b]) => Math.hypot(a - x, b - y) < 40)) continue;
-    dots.push([x, y]);
-  }
-  return dots;
-};
-const nearest = (dots: [number, number][], fx: number, fy: number) => {
-  const tx = OX + fx * MAP_W;
-  const ty = OY + fy * MAP_H;
-  let best = 0;
-  dots.forEach((d, i) => {
-    if (edgeDist(d[0], d[1]) < 120) return;
-    if (edgeDist(dots[best][0], dots[best][1]) < 120 || Math.hypot(d[0] - tx, d[1] - ty) < Math.hypot(dots[best][0] - tx, dots[best][1] - ty)) best = i;
-  });
-  return best;
-};
+  return a; // order[k] = índice del punto que aparece k-ésimo
+})();
+const rank = (() => {
+  const r: number[] = [];
+  order.forEach((idx, k) => (r[idx] = k));
+  return r;
+})();
 
 const SNAP = Easing.bezier(0.75, 0, 0.15, 1);
-// tomas: [entra a, entra b, sale a, sale b], zoom
 const SHOTS = [
-  {inn: [100, 116], out: [152, 160], zoom: 7, at: [0.68, 0.3]},
-  {inn: [162, 176], out: [208, 214], zoom: 8, at: [0.3, 0.76]},
-  {inn: [216, 232], out: [999, 1000], zoom: 9, at: [0.38, 0.46]},
+  {inn: [100, 116], out: [152, 160], zoom: 6.5, site: 0},
+  {inn: [162, 176], out: [208, 214], zoom: 7, site: 1},
+  {inn: [216, 232], out: [999, 1000], zoom: 7.5, site: 2},
 ] as const;
 
 const SCREEN_C: [number, number] = [830, 770]; // dónde queda el súper elegido al hacer zoom
 
 export const MapaBA: React.FC = () => {
   const f = useCurrentFrame();
-  const {cantidad, texto, etiqueta} = TEXTOS.mapa;
-  const dots = useMemo(() => makeDots(cantidad), [cantidad]);
-  const targets = useMemo(() => SHOTS.map((s) => nearest(dots, s.at[0], s.at[1])), [dots]);
+  const {texto, etiqueta, credito} = TEXTOS.mapa;
+  const n = dotsAbs.length;
 
-  // aparición de puntos: acelerada
-  const appear = (i: number) => 16 + 70 * Math.pow(i / cantidad, 0.85);
-  const count = dots.reduce((n, _, i) => n + (f >= appear(i) ? 1 : 0), 0);
+  const appear = (i: number) => 16 + 70 * Math.pow(rank[i] / n, 0.85);
+  const count = useMemo(() => dotsAbs.reduce((c, _, i) => c + (f >= appear(i) ? 1 : 0), 0), [f]);
 
   // cámara
   let amount = 0;
@@ -121,7 +62,8 @@ export const MapaBA: React.FC = () => {
       amount = prog(f, s.inn[0], s.inn[1], SNAP) * (1 - prog(f, s.out[0], s.out[1], SNAP));
     }
   });
-  const target = shot >= 0 ? dots[targets[shot]] : CENTER;
+  const siteIdx = shot >= 0 ? data.sites[SHOTS[shot].site].index : -1;
+  const target = shot >= 0 ? dotsAbs[siteIdx] : CENTER;
   const zoomMax = shot >= 0 ? SHOTS[shot].zoom : 1;
   const z = Math.exp(Math.log(zoomMax) * amount);
   const px = CENTER[0] + (target[0] - CENTER[0]) * amount;
@@ -129,68 +71,113 @@ export const MapaBA: React.FC = () => {
   const cx = CENTER[0] + (SCREEN_C[0] - CENTER[0]) * amount;
   const cy = CENTER[1] + (SCREEN_C[1] - CENTER[1]) * amount;
 
-  const mapIn = prog(f, 0, 14);
+  const mapIn = prog(f, 0, 16);
   const titleOut = 1 - prog(f, 94, 102);
-  const dotR = 9 / Math.pow(z, 0.55);
+  const dotR = 8 / Math.pow(z, 0.55);
+  const labelA = prog(z, 2.2, 3.6, (x) => x);
 
-  // activación (en pantalla, sobre el súper elegido)
   const hold = shot >= 0 ? SHOTS[shot] : null;
   const act = hold
     ? spring({frame: f - (hold.inn[1] - 2), fps: FPS, config: {damping: 13, stiffness: 150, mass: 0.7}}) *
       (1 - prog(f, hold.out[0] - 2, hold.out[0] + 4))
     : 0;
   const pulse = hold ? ((f - hold.inn[1]) % 24) / 24 : 0;
+  const barrio = hold ? data.sites[hold.site].name : '';
+
+  const stroke = {fill: 'none', vectorEffect: 'non-scaling-stroke'} as const;
 
   return (
     <AbsoluteFill style={{background: COLORS.crema, fontFamily: FONT, overflow: 'hidden'}}>
       {/* título */}
       <div style={{position: 'absolute', left: 110, top: 270, opacity: titleOut * mapIn, transform: `translateX(${(1 - mapIn) * -30}px)`}}>
         <div style={{fontWeight: 800, fontSize: 280, lineHeight: 1, color: COLORS.rojo, fontVariantNumeric: 'tabular-nums'}}>{count}</div>
-        <div style={{fontWeight: 600, fontSize: 56, lineHeight: 1.2, color: COLORS.texto, maxWidth: 760, marginTop: 16, textWrap: 'balance'}}>{texto}</div>
+        <div style={{fontWeight: 600, fontSize: 56, lineHeight: 1.2, color: COLORS.texto, maxWidth: 760, marginTop: 16, textWrap: 'balance'}}>
+          {texto}
+        </div>
       </div>
 
-      {/* mapa */}
+      {/* mapa vectorial */}
       <svg width={1920} height={1080} style={{position: 'absolute', inset: 0}}>
-        <defs>
-          <clipPath id="ba">
-            <path d={outlinePath()} />
-          </clipPath>
-        </defs>
         <g
           transform={`translate(${cx} ${cy}) scale(${z}) translate(${-px} ${-py})`}
           opacity={mapIn}
         >
-          <path d={outlinePath()} fill="#E8DCC6" />
-          <g clipPath="url(#ba)" stroke={COLORS.rojo} strokeOpacity={0.12} strokeWidth={1.4} vectorEffect="non-scaling-stroke">
-            <g transform={`rotate(-14 ${CENTER[0]} ${CENTER[1]})`}>
-              {Array.from({length: 62}, (_, i) => (
-                <line key={'h' + i} x1={OX - 300} x2={OX + MAP_W + 300} y1={OY - 100 + i * 20} y2={OY - 100 + i * 20} vectorEffect="non-scaling-stroke" />
-              ))}
-              {Array.from({length: 62}, (_, i) => (
-                <line key={'v' + i} y1={OY - 300} y2={OY + MAP_H + 300} x1={OX - 100 + i * 20} x2={OX - 100 + i * 20} vectorEffect="non-scaling-stroke" />
-              ))}
-            </g>
+          <g transform={`translate(${OX} ${OY})`}>
+            {/* sombra y base */}
+            <path d={data.caba} fill="rgba(43,26,23,0.10)" transform="translate(5 8)" />
+            <path d={data.caba} fill="#EBDFC8" />
+            {/* manzanas (radios censales) */}
+            <path d={data.radios} stroke={COLORS.rojo} strokeOpacity={0.16} strokeWidth={0.5} fill="none" vectorEffect="non-scaling-stroke" />
+            {/* barrios */}
+            <path d={data.barrios} stroke={COLORS.rojo} strokeOpacity={0.5} strokeWidth={1.1} strokeLinejoin="round" {...stroke} />
+            {/* contorno CABA con halo */}
+            <path d={data.caba} stroke={COLORS.rojo} strokeOpacity={0.14} strokeWidth={11} strokeLinejoin="round" {...stroke} />
+            <path d={data.caba} stroke={COLORS.rojo} strokeWidth={3.2} strokeLinejoin="round" {...stroke} />
+            {/* etiquetas de barrios (aparecen al acercar) */}
+            {labelA > 0 &&
+              data.labels.filter((l) => !(act > 0.05 && l.name === barrio)).map((l) => {
+                const size = Math.max(9, Math.min(15, Math.sqrt(l.area) * 0.13)) / Math.pow(z, 0.62);
+                return (
+                  <text
+                    key={l.name}
+                    x={l.x}
+                    y={l.y}
+                    textAnchor="middle"
+                    fontFamily={FONT}
+                    fontWeight={600}
+                    fontSize={size}
+                    letterSpacing={size * 0.12}
+                    fill={COLORS.texto}
+                    fillOpacity={0.62 * labelA}
+                    stroke="#EBDFC8"
+                    strokeWidth={size * 0.28}
+                    strokeOpacity={labelA}
+                    paintOrder="stroke"
+                  >
+                    {l.name.toUpperCase()}
+                  </text>
+                );
+              })}
           </g>
-          <path d={outlinePath()} fill="none" stroke={COLORS.rojo} strokeWidth={4} strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
-          {dots.map(([x, y], i) => {
-            const s = spring({frame: f - appear(i), fps: FPS, config: {damping: 14, stiffness: 220, mass: 0.5}});
-            const isTarget = shot >= 0 && targets[shot] === i;
-            if (f < appear(i)) return null;
+          {/* puntos */}
+          {dotsAbs.map(([x, y], i) => {
+            const t0 = appear(i);
+            if (f < t0) return null;
+            const s = spring({frame: f - t0, fps: FPS, config: {damping: 14, stiffness: 220, mass: 0.5}});
+            const ping = prog(f, t0, t0 + 14);
+            const isT = i === siteIdx;
+            const r = dotR * Math.max(0, s) * (isT ? 1.5 : 1);
             return (
-              <circle
-                key={i}
-                cx={x}
-                cy={y}
-                r={dotR * Math.max(0, s) * (isTarget ? 1.5 : 1)}
-                fill={COLORS.rojo}
-                stroke={COLORS.crema}
-                strokeWidth={2.5}
-                vectorEffect="non-scaling-stroke"
-              />
+              <g key={i}>
+                {ping < 1 && <circle cx={x} cy={y} r={dotR * (1 + ping * 4)} fill="none" stroke={COLORS.rojo} strokeOpacity={0.7 * (1 - ping)} strokeWidth={2} vectorEffect="non-scaling-stroke" />}
+                <circle cx={x} cy={y} r={r * 2} fill={COLORS.rojo} fillOpacity={0.16} />
+                <circle cx={x} cy={y} r={r} fill={COLORS.rojo} stroke={COLORS.crema} strokeWidth={2.5} vectorEffect="non-scaling-stroke" />
+              </g>
             );
           })}
         </g>
+        {/* referencias de agua */}
+        <g opacity={mapIn * titleOut} fontFamily={FONT} fontWeight={400} fill={COLORS.rojo} fillOpacity={0.55} letterSpacing={7} fontSize={17}>
+          <text transform={`translate(${OX + MAP_W * 0.9} ${OY + MAP_H * 0.2}) rotate(41)`} textAnchor="middle">
+            RÍO DE LA PLATA
+          </text>
+        </g>
       </svg>
+
+      <div
+        style={{
+          position: 'absolute',
+          right: 48,
+          bottom: 36,
+          fontWeight: 400,
+          fontSize: 16,
+          color: COLORS.texto,
+          opacity: 0.5 * titleOut * mapIn,
+          textAlign: 'right',
+        }}
+      >
+        {credito}
+      </div>
 
       {/* activación sobre el súper elegido */}
       {hold && act > 0.001 && (
@@ -230,21 +217,20 @@ export const MapaBA: React.FC = () => {
             style={{
               position: 'absolute',
               left: SCREEN_C[0] + 180,
-              top: SCREEN_C[1] - 250,
-              background: COLORS.rojo,
-              color: COLORS.crema,
-              fontWeight: 800,
-              fontSize: 48,
-              padding: '16px 24px',
+              top: SCREEN_C[1] - 290,
               opacity: Math.min(1, act),
               transform: `translateX(${(1 - Math.min(1, act)) * -30}px)`,
             }}
           >
-            {etiqueta}
+            <div style={{fontWeight: 600, fontSize: 28, letterSpacing: '0.2em', color: COLORS.texto, marginBottom: 10}}>
+              {barrio.toUpperCase()}
+            </div>
+            <div style={{background: COLORS.rojo, color: COLORS.crema, fontWeight: 800, fontSize: 48, padding: '16px 24px', display: 'inline-block'}}>
+              {etiqueta}
+            </div>
           </div>
         </>
       )}
     </AbsoluteFill>
   );
 };
-

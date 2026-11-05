@@ -22,6 +22,7 @@ export const TEXTOS = {
     cantidad: 150,
     texto: 'supermercados en Capital Federal.',
     etiqueta: 'Buzón Romance',
+    credito: 'Mapa: radios censales de la Ciudad de Buenos Aires (INDEC / GCBA, datos abiertos). Ubicaciones ilustrativas.',
   },
   // cada ítem es una línea; las palabras aparecen de a una
   concepto: ['el mate', 'que te debo'],
