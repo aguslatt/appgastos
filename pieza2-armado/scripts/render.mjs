@@ -13,12 +13,21 @@ const browserExecutable = process.env.BROWSER_EXECUTABLE || undefined;
 const base = {browserExecutable, chromiumOptions: {}};
 
 // stills a la mitad de cada escena (frames absolutos de ArmadoBTL)
+const tl = JSON.parse(fs.readFileSync(path.join(root, 'src/timeline.json'), 'utf8'));
+const V1 = 345 + tl.mapaDur;
+const V2 = V1 + tl.luces.frames;
+const V3 = V2 + tl.llegada.frames;
+const T = {
+  mapa: [345, 345 + tl.mapaDur], luces: [V1, V2], llegada: [V2, V3],
+  postal: [V3, V3 + 180], cierre: [V3 + 180, V3 + 360],
+};
+const mid = (r) => Math.round((r[0] + r[1]) / 2);
 const STILLS = [
   ['01_dato', 75], ['02_romance_presenta', 195], ['03_concepto', 295],
-  ['04_mapa_150_supers', 345 + 94], ['04b_mapa_zoom_super', 345 + 135],
-  ['05_super_cerrado', 390 + 240], ['06_llega_buzon', 480 + 240], ['07_se_arma', 570 + 240],
-  ['08_va_la_marca', 652 + 240], ['09_accesorios', 735 + 240], ['10_primera_carta', 870 + 240],
-  ['11_adentro', 1005 + 240], ['12_abre_el_super', 1125 + 240], ['13_cierre', 1290 + 240],
+  ['04_mapa_150_supers', T.mapa[0] + 94], ['04b_mapa_zoom_super', T.mapa[0] + 135],
+  ['05_luces_super_cerrado', T.luces[0] + 150], ['06_llega_buzon', T.llegada[0] + 150],
+  ['07_se_arma', mid([T.llegada[0] + 299, T.llegada[1]])], ['08_buzon_listo', T.llegada[1] - 20],
+  ['09_primera_carta', T.postal[0] + 140], ['10_cierre', T.cierre[0] + 90],
 ];
 const PLACAS = [
   ['Placa01Dato', '01_dato'], ['Placa02RomancePresenta', '02_romance_presenta'],
@@ -26,9 +35,7 @@ const PLACAS = [
 ];
 const SUPERS = [
   ['01_0640', '06:40', 'El súper todavía está cerrado.'], ['02_0652', '06:52', 'Llega el buzón.'],
-  ['03_0705', '07:05', 'Se arma.'], ['04_0712', '07:12', 'Va la marca.'],
-  ['05_0720', '07:20', 'Cartel, postales y lapiceras.'], ['06_0731', '07:31', 'La primera carta.'],
-  ['07_0733', '07:33', 'Adentro.'], ['08_0800', '08:00', 'Abre el súper.'],
+  ['03_0705', '07:05', 'Se arma.'], ['04_0731', '07:31', 'La primera carta.'],
 ];
 
 const serveUrl = await bundle({entryPoint: path.join(root, 'src/index.ts'), publicDir: path.join(root, 'public')});

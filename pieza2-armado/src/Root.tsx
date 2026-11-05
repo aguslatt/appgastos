@@ -1,12 +1,11 @@
 import React from 'react';
 import {AbsoluteFill, Composition, Sequence, useCurrentFrame} from 'remotion';
-import {FADE, FPS, H, SUPER_RANGOS, T, TEXTOS, TOTAL, W} from './config';
+import {CLIPS, FADE, FPS, H, SUPER_RANGOS, T, TEXTOS, TOTAL, W} from './config';
 import './fonts';
-import {Adentro, BuzonEnSuper} from './Adentro';
+import {Clip} from './Clip';
 import {MapaBA} from './MapaBA';
 import {Postal} from './Postal';
 import {Cierre, Concepto, Dato, RomancePresenta} from './scenes-basic';
-import {Stage} from './Stage';
 import {Super} from './Super';
 import {prog} from './util';
 
@@ -27,21 +26,15 @@ const Scene: React.FC<{range: readonly [number, number]; fade?: boolean; last?: 
   </Sequence>
 );
 
-const StageScene: React.FC = () => {
-  const f = useCurrentFrame();
-  return <Stage t={f} />;
-};
-
 export const ArmadoBTL: React.FC = () => (
   <AbsoluteFill style={{background: '#000'}}>
     <Scene range={T.dato} fade={false}><Dato /></Scene>
     <Scene range={T.presenta}><RomancePresenta /></Scene>
     <Scene range={T.concepto}><Concepto /></Scene>
     <Scene range={T.mapa}><MapaBA /></Scene>
-    <Scene range={T.stage}><StageScene /></Scene>
+    <Scene range={T.luces}><Clip src={CLIPS.luces.src} desde={CLIPS.luces.desde} /></Scene>
+    <Scene range={T.llegada}><Clip src={CLIPS.llegada.src} desde={CLIPS.llegada.desde} /></Scene>
     <Scene range={T.postal}><Postal /></Scene>
-    <Scene range={T.adentro}><Adentro /></Scene>
-    <Scene range={T.super}><BuzonEnSuper /></Scene>
     <Scene range={T.cierre} last><Cierre /></Scene>
     {SUPER_RANGOS.map((r, i) => (
       <Sequence key={i} from={r[0]} durationInFrames={r[1] - r[0]}>

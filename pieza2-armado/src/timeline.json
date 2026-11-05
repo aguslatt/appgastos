@@ -1,0 +1,5 @@
+{
+  "mapaDur": 240,
+  "luces": {"desde": 0, "frames": 180},
+  "llegada": {"desde": 0, "frames": 570, "corteEn": 299}
+}

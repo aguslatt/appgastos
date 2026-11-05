@@ -1,8 +1,7 @@
 import React from 'react';
-import {AbsoluteFill, spring, useCurrentFrame, useVideoConfig} from 'remotion';
+import {AbsoluteFill, Img, spring, staticFile, useCurrentFrame, useVideoConfig} from 'remotion';
 import {COLORS, TEXTOS} from './config';
 import {FONT, HAND} from './fonts';
-import {Stage} from './Stage';
 import {typed} from './util';
 
 // Escena 9: primer plano de la postal. Fondo = pasillo con el buzón armado, desenfocado.
@@ -20,7 +19,11 @@ export const Postal: React.FC = () => {
   ];
   return (
     <AbsoluteFill style={{background: '#000'}}>
-      <Stage t={600} blur={10} dim={0.5} />
+      <Img
+        src={staticFile('videos/fondo_postal.jpg')}
+        style={{position: 'absolute', inset: -60, width: 2040, height: 1200, objectFit: 'cover', filter: 'blur(12px)'}}
+      />
+      <AbsoluteFill style={{background: 'rgba(20,8,4,0.5)'}} />
       <AbsoluteFill style={{alignItems: 'center', justifyContent: 'center'}}>
         <div
           style={{
