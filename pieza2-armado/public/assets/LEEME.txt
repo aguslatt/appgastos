@@ -1,0 +1,20 @@
+ASSETS - Pieza 2 "Armado del buzón" - Romance / el mate que te debo
+
+CAPAS DEL BUZÓN (mismo lienzo, alineadas pixel a pixel; apilar en este orden):
+  buzon_capa1_base.png         cuerpo rojo + patas + ranura dorada + relieve "el mate que te debo" (sin logo, tapa vacía)
+  buzon_capa2_logo.png         logo "Romance" blanco, ya ubicado sobre el frente
+  buzon_capa3_accesorios.png   atril con cartelito + postales + lapiceras (con sombra de contacto)
+  buzon_completo.png           las tres juntas (referencia)
+  Versiones @2x = mismo contenido escalado x2 (556x974) para usar en 1080p.
+  Tamaño 1x: 278x487. Las patas apoyan en y≈486 (1x) / y≈972 (@2x), el borde inferior del lienzo.
+
+FONDOS
+  fondo_super_gondola.jpg          pasillo de supermercado desenfocado (Adobe Stock, licencia gratuita) 2354x1572
+  buzon_en_super_1920x1080.jpg     buzón ya montado en el súper (plano final de referencia)
+
+MARCA
+  logo_romance_rojo.png            logo Romance rojo con borde blanco (transparente)
+  pack_romance.png                 paquete de yerba Romance recortado
+  buzon_producto_1024.png          foto producto del buzón sobre fondo crema
+
+Tipografía: Montserrat (Google Fonts). Rojo Romance aprox #B3141B, crema #F3EBDD.
