@@ -19,7 +19,16 @@ export const Dato: React.FC = () => {
   return (
     <AbsoluteFill style={fill(COLORS.crema)}>
       <div style={{textAlign: 'center', marginTop: -40}}>
-        <div style={{fontWeight: 800, fontSize: 300, lineHeight: 1, color: COLORS.rojo, fontVariantNumeric: 'tabular-nums'}}>
+        <div
+          style={{
+            fontWeight: 800,
+            fontSize: 300,
+            lineHeight: 1,
+            color: COLORS.rojo,
+            fontVariantNumeric: 'tabular-nums',
+            transform: `scale(${interpolate(f, [0, 6, 30, 36, 46], [0.88, 1, 1, 1.07, 1], clamp)})`,
+          }}
+        >
           {n}
           {TEXTOS.dato.simbolo}
         </div>
@@ -106,8 +115,8 @@ export const Concepto: React.FC = () => {
                   style={{
                     display: 'inline-block',
                     marginRight: '0.28em',
-                    opacity: s,
-                    transform: `translateY(${(1 - s) * 30}px)`,
+                    opacity: Math.min(1, s * 2),
+                    transform: `translateY(${(1 - s) * 40}px) scale(${1.22 - 0.22 * s})`,
                   }}
                 >
                   {w}

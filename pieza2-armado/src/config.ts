@@ -18,6 +18,11 @@ export const TEXTOS = {
     fuente: 'Fuente: encuesta de Bumble a más de 1.000 adultos en Argentina (2023).',
   },
   presenta: 'presenta',
+  mapa: {
+    cantidad: 150,
+    texto: 'supermercados en Capital Federal.',
+    etiqueta: 'Buzón Romance',
+  },
   // cada ítem es una línea; las palabras aparecen de a una
   concepto: ['el mate', 'que te debo'],
   // supers de horario (escenas 4 a 11, en orden)
@@ -51,28 +56,33 @@ export const TEXTOS = {
 export const FPS = 30;
 export const W = 1920;
 export const H = 1080;
-export const TOTAL = 1380;
+export const MAPA_DUR = 240;
+export const TOTAL = 1380 + MAPA_DUR;
 export const FADE = 6;
 
+const D = MAPA_DUR;
 export const T = {
   dato: [0, 150],
   presenta: [150, 240],
   concepto: [240, 345],
-  stage: [345, 780], // escenas 4 a 8 (buzón continuo)
-  postal: [780, 960], // escena 9
-  adentro: [960, 1050], // escena 10
-  super: [1050, 1200], // escena 11
-  cierre: [1200, 1380],
+  mapa: [345, 345 + D], // mapa de Capital Federal con 150 supermercados
+  stage: [345 + D, 780 + D], // escenas 4 a 8 (buzón continuo)
+  postal: [780 + D, 960 + D], // escena 9
+  adentro: [960 + D, 1050 + D], // escena 10
+  super: [1050 + D, 1200 + D], // escena 11
+  cierre: [1200 + D, 1380 + D],
 } as const;
 
 // Rango de cada super de horario
-export const SUPER_RANGOS: [number, number][] = [
-  [345, 435],
-  [435, 525],
-  [525, 615],
-  [615, 690],
-  [690, 780],
-  [780, 960],
-  [960, 1050],
-  [1050, 1200],
-];
+export const SUPER_RANGOS: [number, number][] = (
+  [
+    [345, 435],
+    [435, 525],
+    [525, 615],
+    [615, 690],
+    [690, 780],
+    [780, 960],
+    [960, 1050],
+    [1050, 1200],
+  ] as [number, number][]
+).map(([a, b]) => [a + D, b + D]);

@@ -3,6 +3,7 @@ import {AbsoluteFill, Composition, Sequence, useCurrentFrame} from 'remotion';
 import {FADE, FPS, H, SUPER_RANGOS, T, TEXTOS, TOTAL, W} from './config';
 import './fonts';
 import {Adentro, BuzonEnSuper} from './Adentro';
+import {MapaBA} from './MapaBA';
 import {Postal} from './Postal';
 import {Cierre, Concepto, Dato, RomancePresenta} from './scenes-basic';
 import {Stage} from './Stage';
@@ -36,6 +37,7 @@ export const ArmadoBTL: React.FC = () => (
     <Scene range={T.dato} fade={false}><Dato /></Scene>
     <Scene range={T.presenta}><RomancePresenta /></Scene>
     <Scene range={T.concepto}><Concepto /></Scene>
+    <Scene range={T.mapa}><MapaBA /></Scene>
     <Scene range={T.stage}><StageScene /></Scene>
     <Scene range={T.postal}><Postal /></Scene>
     <Scene range={T.adentro}><Adentro /></Scene>
@@ -59,6 +61,7 @@ export const RemotionRoot: React.FC = () => {
       <Composition id="Placa01Dato" component={Dato} durationInFrames={dur(T.dato)} {...common} />
       <Composition id="Placa02RomancePresenta" component={RomancePresenta} durationInFrames={dur(T.presenta)} {...common} />
       <Composition id="Placa03Concepto" component={Concepto} durationInFrames={dur(T.concepto)} {...common} />
+      <Composition id="Placa04Mapa" component={MapaBA} durationInFrames={dur(T.mapa)} {...common} />
       <Composition id="Placa12Cierre" component={Cierre} durationInFrames={dur(T.cierre)} {...common} />
       <Composition
         id="Super"

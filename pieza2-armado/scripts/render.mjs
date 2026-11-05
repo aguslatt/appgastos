@@ -15,13 +15,14 @@ const base = {browserExecutable, chromiumOptions: {}};
 // stills a la mitad de cada escena (frames absolutos de ArmadoBTL)
 const STILLS = [
   ['01_dato', 75], ['02_romance_presenta', 195], ['03_concepto', 295],
-  ['04_super_cerrado', 390], ['05_llega_buzon', 480], ['06_se_arma', 570],
-  ['07_va_la_marca', 652], ['08_accesorios', 735], ['09_primera_carta', 870],
-  ['10_adentro', 1005], ['11_abre_el_super', 1125], ['12_cierre', 1290],
+  ['04_mapa_150_supers', 345 + 94], ['04b_mapa_zoom_super', 345 + 135],
+  ['05_super_cerrado', 390 + 240], ['06_llega_buzon', 480 + 240], ['07_se_arma', 570 + 240],
+  ['08_va_la_marca', 652 + 240], ['09_accesorios', 735 + 240], ['10_primera_carta', 870 + 240],
+  ['11_adentro', 1005 + 240], ['12_abre_el_super', 1125 + 240], ['13_cierre', 1290 + 240],
 ];
 const PLACAS = [
   ['Placa01Dato', '01_dato'], ['Placa02RomancePresenta', '02_romance_presenta'],
-  ['Placa03Concepto', '03_el_mate_que_te_debo'], ['Placa12Cierre', '12_cierre'],
+  ['Placa03Concepto', '03_el_mate_que_te_debo'], ['Placa04Mapa', '04_mapa_150_supermercados'], ['Placa12Cierre', '12_cierre'],
 ];
 const SUPERS = [
   ['01_0640', '06:40', 'El súper todavía está cerrado.'], ['02_0652', '06:52', 'Llega el buzón.'],
